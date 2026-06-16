@@ -1,0 +1,6 @@
+{
+  "name": "FitClub",
+  "description": "Una aplicación social para competir en la pérdida de peso mediante un sistema de puntos y progreso relativo, fomentando la motivación grupal sin exponer el peso exacto.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

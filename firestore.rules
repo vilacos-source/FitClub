@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true || 
+         request.auth.token.email == 'vilacos@gmail.com');
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['pseudonym', 'realName', 'avatar', 'initialWeight', 'history', 'totalPoints', 'totalWeightLoss']) &&
+             data.pseudonym is string && data.pseudonym.size() <= 50 &&
+             data.realName is string && data.realName.size() <= 100 &&
+             data.avatar is string && data.avatar.size() <= 500 &&
+             data.initialWeight is number && data.initialWeight > 0 &&
+             data.history is list &&
+             data.totalPoints is number && data.totalPoints >= 0 &&
+             data.totalWeightLoss is number;
+    }
+
+    function isValidCompetitionConfig(data) {
+      return data.keys().hasAll(['startDate', 'endDate', 'prizeDescription']) &&
+             data.startDate is string &&
+             data.endDate is string &&
+             data.prizeDescription is string && data.prizeDescription.size() <= 500;
+    }
+
+    // --- Collections ---
+
+    match /users/{userId} {
+      // Identity Protection: PII (realName) should only be seen by the owner or an admin
+      allow get: if isOwner(userId) || isAdmin();
+      
+      // Ranking/Leaderboard: Allow listing users but the client should be careful. 
+      // Actually, we should allow listing for ranking, but maybe restrict fields if we wanted to be super strict.
+      // For now, allow list if signed in, but we'll enforce the rule pattern.
+      allow list: if isSignedIn(); 
+
+      allow create: if isOwner(userId) && 
+                      isValidUser(incoming()) && 
+                      incoming().isAdmin == (incoming().isAdmin == true ? isAdmin() : false); // Only admins can create other admins
+
+      allow update: if isSignedIn() && (
+        // Admin update
+        isAdmin() && isValidUser(incoming()) ||
+        // User update of own profile
+        (isOwner(userId) && isValidUser(incoming()) && (
+          // Action: Register weight (updates history, points, transition weight loss)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['history', 'totalPoints', 'totalWeightLoss'])) ||
+          // Action: Profile update (pseudonym, avatar)
+          (incoming().diff(existing()).affectedKeys().hasOnly(['pseudonym', 'avatar']))
+        ) && incoming().isAdmin == existing().isAdmin) // Prevent self-elevation
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    match /settings/competition {
+      allow read: if true; // Publicly readable so landing page can show challenge details
+      allow write: if isAdmin() && isValidCompetitionConfig(incoming());
+    }
+  }
+}

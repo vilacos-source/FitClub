@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and weight history tracker.",
+      "type": "object",
+      "properties": {
+        "pseudonym": { "type": "string", "description": "Display name for leaderboard." },
+        "realName": { "type": "string", "description": "Private real name for admin." },
+        "avatar": { "type": "string", "description": "URL to user icon." },
+        "initialWeight": { "type": "number", "description": "Weight at start of competition." },
+        "history": {
+          "type": "array",
+          "items": { "type": "object", "$ref": "WeighIn" }
+        },
+        "totalPoints": { "type": "number" },
+        "totalWeightLoss": { "type": "number" },
+        "isAdmin": { "type": "boolean" }
+      },
+      "required": ["pseudonym", "realName", "avatar", "initialWeight", "history", "totalPoints", "totalWeightLoss"]
+    },
+    "WeighIn": {
+      "title": "WeighIn",
+      "description": "A single weight record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "weight": { "type": "number" },
+        "delta": { "type": "number" },
+        "points": { "type": "number" },
+        "ateOut": { "type": "boolean" }
+      }
+    },
+    "CompetitionConfig": {
+      "title": "CompetitionConfig",
+      "description": "Global settings for the competition.",
+      "type": "object",
+      "properties": {
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "prizeDescription": { "type": "string" }
+      },
+      "required": ["startDate", "endDate", "prizeDescription"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Root collection for users."
+    },
+    "/settings/competition": {
+      "schema": "CompetitionConfig",
+      "description": "Global competition configuration."
+    }
+  }
+}
