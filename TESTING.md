@@ -19,24 +19,28 @@ mejorar conjuntamente.
   en el workflow de despliegue.
 - **Cubierto por:** smoke test **S1**.
 
-### INC-002 — El registro de usuario falla 🔴 ABIERTO (requiere acción tuya en Firebase)
+### INC-002 — El registro de usuario falla 🟢 RESUELTO
 - **Síntoma:** al pulsar "¡Unirme al grupo!" aparece
   `Error: Firebase: Error (auth/operation-not-allowed).`
 - **Reproducido:** sí, en la web publicada y por API REST
   (`OPERATION_NOT_ALLOWED`).
-- **Causa raíz:** el proveedor **Email/Password está deshabilitado** en el
-  proyecto Firebase `gen-lang-client-0504040822`.
-- **Acción:** Firebase Console → **Authentication → Sign-in method →
-  Email/Password → Habilitar → Guardar**.
+- **Causa raíz:** el proveedor **Email/Password no estaba añadido** al
+  proyecto Firebase `gen-lang-client-0504040822` (solo tenía Google).
+- **Solución aplicada:** Firebase Console → Authentication → Método de acceso →
+  **Agregar proveedor nuevo → Correo electrónico/contraseña → Habilitar**.
+- **Verificado:** el error pasó de `OPERATION_NOT_ALLOWED` a
+  `INVALID_LOGIN_CREDENTIALS` (el esperado para un usuario inexistente), y el
+  smoke test S3 pasa.
 - **Cubierto por:** smoke test **S3**.
 
-### INC-003 — Login/registro fallará por dominio no autorizado 🔴 ABIERTO (requiere acción tuya)
+### INC-003 — Dominio no autorizado 🟢 RESUELTO
 - **Síntoma previsto:** tras arreglar INC-002, el registro fallará con
   `auth/unauthorized-domain`.
-- **Causa raíz:** `vilacos-source.github.io` no está en la lista de dominios
+- **Causa raíz:** `vilacos-source.github.io` no estaba en la lista de dominios
   autorizados del proyecto Firebase.
-- **Acción:** Firebase Console → **Authentication → Settings → Authorized
-  domains → Add domain → `vilacos-source.github.io`**.
+- **Solución aplicada:** Firebase Console → Authentication → Configuración →
+  Authorized domains → agregar `vilacos-source.github.io`.
+- **Verificado:** confirmado por API (`authorizedDomains` ya lo incluye).
 - **Cubierto por:** smoke test **S3**.
 
 ### INC-004 — El admin nunca se creaba 🟢
@@ -85,7 +89,7 @@ npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview
 |------|--------------|--------|
 | S1 | La app carga y monta el landing (no página en blanco) | ✅ pasa |
 | S2 | El formulario de registro se abre con todos sus campos | ✅ pasa |
-| S3 | El registro de un usuario nuevo funciona de verdad | ❌ falla → **INC-002 / INC-003** |
+| S3 | El registro de un usuario nuevo funciona de verdad | ✅ pasa |
 | S4 | El login con credenciales malas da error controlado | ✅ pasa |
 | S5 | La app no se queda en spinner infinito | ✅ pasa |
 | S6 | No hay errores fatales en consola al cargar | ✅ pasa |
