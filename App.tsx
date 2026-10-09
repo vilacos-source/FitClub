@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, WeighIn, CompetitionConfig } from './types';
+import { User, PublicProfile, PrivateData, RankedUser, WeighIn, CompetitionConfig } from './types';
 import { INITIAL_RULES, FRUITS } from './constants';
 import TopNav from './components/TopNav';
 import Dashboard from './components/Dashboard';
@@ -10,7 +10,7 @@ import AdminSettings from './components/AdminSettings';
 import LandingPage from './components/LandingPage';
 
 // Firebase imports
-import { db, auth, handleFirestoreError, OperationType } from './services/firebase';
+import { db, auth, handleFirestoreError, OperationType, publicProfileRef, privateDataRef, PUBLIC_COLLECTION } from './services/firebase';
 import { 
   collection, 
   onSnapshot, 
@@ -39,11 +39,14 @@ const ADMIN_EMAILS = ['vilacos@gmail.com'];
 type View = 'dashboard' | 'leaderboard' | 'rules' | 'admin' | 'welcome';
 
 const App: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<PublicProfile[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [isLoading, setIsLoading] = useState(true);
   const [competitionConfig, setCompetitionConfig] = useState<CompetitionConfig | null>(null);
+  // Solo para administradores: mapa uid → nombre real, traído de la colección
+  // privada `users`. Sin esto, el admin no podría ver los nombres reales.
+  const [adminRealNames, setAdminRealNames] = useState<Record<string, string>>({});
 
   // 1. Escuchar Cambios de Autenticación y Probar Conexión
   useEffect(() => {
@@ -60,12 +63,23 @@ const App: React.FC = () => {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // El usuario está logueado, buscamos sus datos en Firestore
+        // El usuario está logueado. Sus datos viven en dos sitios:
+        //  - `leaderboard/{uid}` → perfil público
+        //  - `users/{uid}`       → datos privados (nombre real, historial)
         try {
-          const userRef = doc(db, "users", firebaseUser.uid);
-          const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            setCurrentUser({ id: firebaseUser.uid, ...userSnap.data() } as User);
+          const [pubSnap, privSnap] = await Promise.all([
+            getDoc(publicProfileRef(firebaseUser.uid)),
+            getDoc(privateDataRef(firebaseUser.uid)),
+          ]);
+          if (pubSnap.exists()) {
+            const priv: PrivateData = privSnap.exists()
+              ? (privSnap.data() as PrivateData)
+              : { realName: '', history: [] };
+            setCurrentUser({
+              id: firebaseUser.uid,
+              ...(pubSnap.data() as Omit<PublicProfile, 'id'>),
+              ...priv,
+            });
           }
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
@@ -105,19 +119,22 @@ const App: React.FC = () => {
 
     let unsubUsers = () => {};
 
-    // Escuchar Usuarios (Solo si está logueado)
+    // Escuchar el ranking (colección PÚBLICA). Solo si hay sesión.
     if (auth.currentUser) {
-      const q = query(collection(db, "users"), orderBy("totalPoints", "desc"));
+      const q = query(collection(db, PUBLIC_COLLECTION), orderBy("totalPoints", "desc"));
       unsubUsers = onSnapshot(q, (snapshot) => {
-        const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        const usersData = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as PublicProfile));
         setUsers(usersData);
-        
+
         if (auth.currentUser) {
           const me = usersData.find(u => u.id === auth.currentUser?.uid);
-          if (me) setCurrentUser(me);
+          // Solo refrescamos la parte pública: los datos privados (historial,
+          // nombre real) vienen del otro documento y no deben pisarse.
+          if (me) setCurrentUser((prev: User | null) => (prev ? { ...prev, ...me } : prev));
         }
       }, (error) => {
-        handleFirestoreError(error, OperationType.LIST, "users");
+        // No tumbamos la app por un fallo puntual de lectura del ranking.
+        console.error("No se pudo leer el ranking:", error);
       });
     }
 
@@ -126,6 +143,35 @@ const App: React.FC = () => {
       unsubConfig();
     };
   }, [isLoading, auth.currentUser?.uid]); // Re-run when auth loading finishes or auth user changes
+
+  // 3. Solo para administradores: traer los nombres reales desde la colección
+  // privada. Se hace aparte justamente porque NO pueden estar en el documento
+  // público (cualquier usuario con sesión podría leerlos).
+  const userIdsKey = users.map(u => u.id).join(',');
+  useEffect(() => {
+    if (!currentUser?.isAdmin || !userIdsKey) {
+      setAdminRealNames({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const ids = userIdsKey.split(',');
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const snap = await getDoc(privateDataRef(id));
+            return [id, snap.exists() ? String((snap.data() as PrivateData).realName ?? '') : ''] as const;
+          } catch {
+            return [id, ''] as const; // sin permiso o sin documento: no rompemos la vista
+          }
+        }),
+      );
+      if (!cancelled) setAdminRealNames(Object.fromEntries(entries));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.isAdmin, userIdsKey]);
 
   const getLocalDate = (date = new Date()) => {
     const offset = date.getTimezoneOffset();
@@ -188,15 +234,24 @@ const App: React.FC = () => {
       ateOut: ateOut
     };
 
-    const updatedData = {
-      history: [...currentUser.history, newWeighIn],
-      totalPoints: Math.max(0, currentUser.totalPoints + earnedPoints),
-      totalWeightLoss: newLoss
-    };
+    const newHistory = [...currentUser.history, newWeighIn];
+    const newTotalPoints = Math.max(0, currentUser.totalPoints + earnedPoints);
 
-    // PERSISTENCIA EN FIRESTORE
+    // PERSISTENCIA EN FIRESTORE — en dos documentos, cada uno con lo suyo:
+    //  - `users/{uid}`       → el historial de pesajes (privado)
+    //  - `leaderboard/{uid}` → los totales que ve el ranking (público)
     try {
-      await updateDoc(doc(db, "users", currentUser.id), updatedData);
+      await updateDoc(privateDataRef(currentUser.id), { history: newHistory });
+      await updateDoc(publicProfileRef(currentUser.id), {
+        totalPoints: newTotalPoints,
+        totalWeightLoss: newLoss,
+      });
+      setCurrentUser({
+        ...currentUser,
+        history: newHistory,
+        totalPoints: newTotalPoints,
+        totalWeightLoss: newLoss,
+      });
       alert(`¡Peso registrado! +${earnedPoints} pts.\n${messages.join('\n')}`);
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `users/${currentUser.id}`);
@@ -204,33 +259,40 @@ const App: React.FC = () => {
   };
 
   const handleRegister = async (userData: { realName: string, pseudonym: string, initialWeight: number }) => {
-    // La creación de usuario ahora se gestiona en LandingPage mediante Firebase Auth
-    // Esta función se llama tras el éxito del Auth para crear el documento en Firestore
+    // El alta en Firebase Auth se hace en LandingPage. Esta función se llama
+    // después y crea los DOS documentos del usuario:
+    //  - `leaderboard/{uid}` → datos públicos (lo que ve el ranking)
+    //  - `users/{uid}`       → datos privados (nombre real + historial)
+    if (!auth.currentUser) return;
+
+    const uid = auth.currentUser.uid;
     const fruit = FRUITS[Math.floor(Math.random() * FRUITS.length)];
-    const newUser: Omit<User, 'id'> = {
-      realName: userData.realName,
+
+    const publicProfile: Omit<PublicProfile, 'id'> = {
       pseudonym: userData.pseudonym,
-      initialWeight: userData.initialWeight,
       avatar: `https://img.icons8.com/fluency/200/${fruit}.png`,
-      history: [],
+      initialWeight: userData.initialWeight,
       totalPoints: 0,
       totalWeightLoss: 0,
       // Ser admin se decide por el email de la cuenta (ver ADMIN_EMAILS).
       // Antes era `users.length === 0`, que no funcionaba: `users` solo se
-      // rellena para usuarios ya logueados, así que nunca valía 0 en el
+      // rellenaba para usuarios ya logueados, así que nunca valía 0 en el
       // primer registro y el admin no se creaba nunca.
-      isAdmin: ADMIN_EMAILS.includes(auth.currentUser?.email ?? '')
+      isAdmin: ADMIN_EMAILS.includes(auth.currentUser.email ?? ''),
     };
 
-    if (auth.currentUser) {
-      try {
-        const userWithId = { id: auth.currentUser.uid, ...newUser } as User;
-        await setDoc(doc(db, "users", auth.currentUser.uid), newUser);
-        setCurrentUser(userWithId);
-        setActiveView('dashboard');
-      } catch (e) {
-        handleFirestoreError(e, OperationType.CREATE, `users/${auth.currentUser.uid}`);
-      }
+    const privateData: PrivateData = {
+      realName: userData.realName,
+      history: [],
+    };
+
+    try {
+      await setDoc(publicProfileRef(uid), publicProfile);
+      await setDoc(privateDataRef(uid), privateData);
+      setCurrentUser({ id: uid, ...publicProfile, ...privateData });
+      setActiveView('dashboard');
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, `users/${uid}`);
     }
   };
 
@@ -246,6 +308,13 @@ const App: React.FC = () => {
   const handleLogout = () => {
     signOut(auth);
   };
+
+  // Lista que consume la interfaz: datos públicos siempre y, para un admin,
+  // el nombre real traído aparte de la colección privada.
+  const rankedUsers: RankedUser[] = users.map(u => ({
+    ...u,
+    realName: adminRealNames[u.id],
+  }));
 
   if (isLoading) {
     return (
@@ -274,7 +343,7 @@ const App: React.FC = () => {
           <Dashboard user={currentUser} leaderboard={users} onAddWeight={handleAddWeight} config={competitionConfig} />
         )}
         {activeView === 'leaderboard' && (
-          <Leaderboard users={users} currentUser={currentUser} config={competitionConfig} />
+          <Leaderboard users={rankedUsers} currentUser={currentUser} config={competitionConfig} />
         )}
         {activeView === 'rules' && (
           <Rules rules={INITIAL_RULES} />
@@ -282,33 +351,39 @@ const App: React.FC = () => {
         {activeView === 'admin' && currentUser.isAdmin && (
           <AdminSettings 
             config={competitionConfig} onUpdateConfig={handleUpdateConfig} 
-            users={users} 
+            users={rankedUsers} 
             onRemoveUser={async (id) => {
               if (confirm("¿Estás seguro de que quieres eliminar a este usuario?")) {
                 try {
-                  await deleteDoc(doc(db, "users", id));
+                  // Hay que borrar los dos documentos: el público y el privado.
+                  await deleteDoc(privateDataRef(id));
+                  await deleteDoc(publicProfileRef(id));
                 } catch (e) {
                   handleFirestoreError(e, OperationType.DELETE, `users/${id}`);
                 }
               }
             }} 
             onAddUser={async (data) => {
-              // Creating a placeholder doc without auth - for real usage they should use LandingPage
-              // But if admin adds them, we create a doc with a random ID
+              // Crea un participante "de relleno", sin cuenta de acceso: podrá
+              // verlo el admin pero esa persona no podrá entrar hasta que se
+              // registre ella misma desde la pantalla de inicio.
               const fruit = FRUITS[Math.floor(Math.random() * FRUITS.length)];
               const id = Math.random().toString(36).substr(2, 9);
-              const newUser: Omit<User, 'id'> = {
-                realName: data.realName,
+              const publicProfile: Omit<PublicProfile, 'id'> = {
                 pseudonym: data.pseudonym,
-                initialWeight: data.initialWeight,
                 avatar: `https://img.icons8.com/fluency/200/${fruit}.png`,
-                history: [],
+                initialWeight: data.initialWeight,
                 totalPoints: 0,
                 totalWeightLoss: 0,
-                isAdmin: false
+                isAdmin: false,
+              };
+              const privateData: PrivateData = {
+                realName: data.realName,
+                history: [],
               };
               try {
-                await setDoc(doc(db, "users", id), newUser);
+                await setDoc(publicProfileRef(id), publicProfile);
+                await setDoc(privateDataRef(id), privateData);
               } catch (e) {
                 handleFirestoreError(e, OperationType.CREATE, `users/${id}`);
               }
@@ -317,9 +392,10 @@ const App: React.FC = () => {
               const user = users.find(u => u.id === id);
               if (user) {
                 try {
-                  await updateDoc(doc(db, "users", id), { isAdmin: !user.isAdmin });
+                  // El rol vive en el documento público (lo necesita el ranking).
+                  await updateDoc(publicProfileRef(id), { isAdmin: !user.isAdmin });
                 } catch (e) {
-                  handleFirestoreError(e, OperationType.UPDATE, `users/${id}`);
+                  handleFirestoreError(e, OperationType.UPDATE, `leaderboard/${id}`);
                 }
               }
             }}

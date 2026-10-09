@@ -1,12 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 1. Global Safety Net
+
+    // Red de seguridad: nada accesible salvo lo permitido explícitamente abajo.
     match /{document=**} {
       allow read, write: if false;
     }
 
     // --- Helpers ---
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -15,19 +17,15 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Lista de administradores por email. Debe coincidir con ADMIN_EMAILS
-    // en App.tsx. Ser admin se decide AQUÍ (no por un campo que el propio
-    // usuario pueda escribir: eso sería escalada de privilegios).
+    // Administradores por email. Debe coincidir con ADMIN_EMAILS en App.tsx.
+    // El rol se decide aquí, no por un campo escribible por el propio usuario
+    // (eso sería una escalada de privilegios).
     function adminEmails() {
       return ['vilacos@gmail.com'];
     }
 
     function isAdmin() {
       return isSignedIn() && request.auth.token.email in adminEmails();
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -38,17 +36,24 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // --- Entity Validations ---
+    // --- Validaciones ---
 
-    function isValidUser(data) {
-      return data.keys().hasAll(['pseudonym', 'realName', 'avatar', 'initialWeight', 'history', 'totalPoints', 'totalWeightLoss']) &&
-             data.pseudonym is string && data.pseudonym.size() <= 50 &&
-             data.realName is string && data.realName.size() <= 100 &&
+    // Datos públicos: NUNCA pueden contener información personal.
+    function isValidPublic(data) {
+      return data.keys().hasAll(['pseudonym', 'avatar', 'initialWeight', 'totalPoints', 'totalWeightLoss', 'isAdmin']) &&
+             data.pseudonym is string && data.pseudonym.size() > 0 && data.pseudonym.size() <= 50 &&
              data.avatar is string && data.avatar.size() <= 500 &&
              data.initialWeight is number && data.initialWeight > 0 &&
-             data.history is list &&
              data.totalPoints is number && data.totalPoints >= 0 &&
-             data.totalWeightLoss is number;
+             data.totalWeightLoss is number &&
+             data.isAdmin is bool;
+    }
+
+    // Datos privados: nombre real e historial de pesajes.
+    function isValidPrivate(data) {
+      return data.keys().hasAll(['realName', 'history']) &&
+             data.realName is string && data.realName.size() > 0 && data.realName.size() <= 100 &&
+             data.history is list && data.history.size() <= 2000;
     }
 
     function isValidCompetitionConfig(data) {
@@ -58,38 +63,53 @@ service cloud.firestore {
              data.prizeDescription is string && data.prizeDescription.size() <= 500;
     }
 
-    // --- Collections ---
+    // ==========================================================
+    // /leaderboard/{userId} → DATOS PÚBLICOS (alimenta el ranking)
+    // Lo lee cualquier usuario con sesión. Nada personal aquí.
+    // ==========================================================
+    match /leaderboard/{userId} {
+      allow read: if isSignedIn();
 
-    match /users/{userId} {
-      // Identity Protection: PII (realName) should only be seen by the owner or an admin
-      allow get: if isOwner(userId) || isAdmin();
-      
-      // Ranking/Leaderboard: Allow listing users but the client should be careful. 
-      // Actually, we should allow listing for ranking, but maybe restrict fields if we wanted to be super strict.
-      // For now, allow list if signed in, but we'll enforce the rule pattern.
-      allow list: if isSignedIn(); 
+      // Alta: el propio usuario (nunca auto-ascendido a admin) o un admin.
+      allow create: if isValidPublic(incoming()) &&
+                      ((isOwner(userId) && incoming().isAdmin == false) || isAdmin());
 
-      allow create: if isOwner(userId) && 
-                      isValidUser(incoming()) && 
-                      incoming().isAdmin == isAdmin(); // El campo isAdmin debe reflejar la lista real
-
-      allow update: if isSignedIn() && (
-        // Admin update
-        isAdmin() && isValidUser(incoming()) ||
-        // User update of own profile
-        (isOwner(userId) && isValidUser(incoming()) && (
-          // Action: Register weight (updates history, points, transition weight loss)
-          (incoming().diff(existing()).affectedKeys().hasOnly(['history', 'totalPoints', 'totalWeightLoss'])) ||
-          // Action: Profile update (pseudonym, avatar)
-          (incoming().diff(existing()).affectedKeys().hasOnly(['pseudonym', 'avatar']))
-        ) && incoming().isAdmin == existing().isAdmin) // Prevent self-elevation
-      );
+      // Modificación: un admin puede todo; el dueño solo sus propios datos y
+      // no puede tocarse el rol (evita el auto-ascenso a admin).
+      allow update: if isValidPublic(incoming()) && (
+                      isAdmin() ||
+                      (isOwner(userId) &&
+                       incoming().isAdmin == existing().isAdmin &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['totalPoints', 'totalWeightLoss', 'pseudonym', 'avatar']))
+                    );
 
       allow delete: if isAdmin();
     }
 
+    // ==========================================================
+    // /users/{userId} → DATOS PRIVADOS (nombre real, historial)
+    // Solo su dueño o un administrador.
+    // ==========================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if isValidPrivate(incoming()) && (isOwner(userId) || isAdmin());
+
+      // El dueño solo puede añadir pesajes (el historial); el resto de sus
+      // datos privados no son editables desde el cliente.
+      allow update: if isValidPrivate(incoming()) && (
+                      isAdmin() ||
+                      (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['history']))
+                    );
+
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================================
+    // /settings/competition → configuración del reto
+    // ==========================================================
     match /settings/competition {
-      allow read: if true; // Publicly readable so landing page can show challenge details
+      allow read: if true; // Público: la landing muestra las fechas del reto
       allow write: if isAdmin() && isValidCompetitionConfig(incoming());
     }
   }

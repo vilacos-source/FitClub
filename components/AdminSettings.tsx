@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
 import { Trash2, ShieldCheck, ShieldAlert, Plus } from 'lucide-react';
-import { CompetitionConfig, User } from '../types';
+import { CompetitionConfig, RankedUser } from '../types';
 
 interface AdminSettingsProps {
   config: CompetitionConfig;
   onUpdateConfig: (newConfig: CompetitionConfig) => void;
-  users: User[];
+  users: RankedUser[];
   onRemoveUser: (userId: string) => void;
   onAddUser: (userData: { realName: string, pseudonym: string, initialWeight: number }) => void;
   onToggleAdmin: (userId: string) => void;
@@ -14,7 +14,7 @@ interface AdminSettingsProps {
 
 const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, users, onRemoveUser, onAddUser, onToggleAdmin }) => {
   const [formData, setFormData] = useState<CompetitionConfig>(config);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<RankedUser | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   
   const [newUser, setNewUser] = useState({

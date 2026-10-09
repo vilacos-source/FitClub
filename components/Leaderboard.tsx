@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { User, CompetitionConfig } from '../types';
+import { User, RankedUser, CompetitionConfig } from '../types';
 
 interface LeaderboardProps {
-  users: User[];
+  users: RankedUser[];
   currentUser: User | null;
   config: CompetitionConfig;
 }

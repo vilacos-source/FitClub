@@ -1,6 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { User } from "../types";
+import { User, PublicProfile } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -25,7 +25,7 @@ const replacePlaceholders = (text: string, user: User) => {
     .replace(/{weight}/g, user.initialWeight.toString());
 };
 
-export const getMotivationalMessage = async (user: User, leaderboard: User[]) => {
+export const getMotivationalMessage = async (user: User, leaderboard: PublicProfile[]) => {
   const position = leaderboard.findIndex(u => u.id === user.id) + 1;
   const lastChange = user.history.length > 0 ? user.history[user.history.length - 1].delta : 0;
   

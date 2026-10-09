@@ -1,13 +1,13 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, TrendingUp, PenLine, History } from 'lucide-react';
-import { User, CompetitionConfig } from '../types';
+import { User, PublicProfile, CompetitionConfig } from '../types';
 import { ResponsiveContainer, Tooltip, AreaChart, Area } from 'recharts';
 import { getMotivationalMessage, getWelcomeMessage } from '../services/geminiService';
 
 interface DashboardProps {
   user: User;
-  leaderboard: User[];
+  leaderboard: PublicProfile[];
   onAddWeight: (weight: number, ateOut: boolean) => void;
   config: CompetitionConfig;
 }

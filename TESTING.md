@@ -73,6 +73,22 @@ mejorar conjuntamente.
   servicio Gemini si no se va a usar.
 - **Cubierto por:** smoke test **S6** (filtra este aviso como no fatal).
 
+### INC-007 — Cualquier usuario podía leer los nombres reales y los pesos de todos 🟢 (código listo, pendiente publicar reglas)
+- **Síntoma:** una cuenta recién creada, sin perfil y sin permisos, podía descargar
+  el nombre real, el peso inicial y el historial de pesajes de todo el grupo.
+- **Reproducido:** sí, con el SDK real de Firestore (ver `tests/e2e/privacy.spec.ts`).
+- **Causa raíz:** los datos personales vivían en la misma colección (`users`) que
+  alimentaba el ranking, con `allow list: if isSignedIn()`. Firestore **no puede
+  ocultar campos en una consulta**: si el documento es legible, lo son todos sus
+  campos. El `if (isAdmin)` de `Leaderboard.tsx` era solo un candado visual.
+  Contradecía el propio `security_spec.md` (payload #11, "PII Leak").
+- **Solución:** separar en dos colecciones según sensibilidad:
+  - `leaderboard/{uid}` → datos públicos (pseudónimo, avatar, puntos, kg). Lo lee
+    cualquier usuario con sesión.
+  - `users/{uid}` → datos privados (nombre real, historial). Solo su dueño y admins.
+  El admin obtiene los nombres reales aparte, leyendo la colección privada.
+- **Cubierto por:** smoke tests **S7a–S7f**.
+
 ---
 
 ## Batería de smoke tests
@@ -93,6 +109,12 @@ npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview
 | S4 | El login con credenciales malas da error controlado | ✅ pasa |
 | S5 | La app no se queda en spinner infinito | ✅ pasa |
 | S6 | No hay errores fatales en consola al cargar | ✅ pasa |
+| S7a | El ranking se lee, pero no contiene datos personales | ✅ |
+| S7b | Un usuario normal NO puede listar la colección privada | ✅ |
+| S7c | Un usuario normal NO puede leer el documento privado de otro | ✅ |
+| S7d | Cada usuario sí puede leer y escribir sus propios datos privados | ✅ |
+| S7e | Nadie puede auto-ascenderse a administrador | ✅ |
+| S7f | Un usuario normal no puede escribir la configuración del reto | ✅ |
 
 El informe de cada ejecución queda como artefacto `smoke-test-report` en la
 pestaña **Actions** del repositorio (30 días de retención).

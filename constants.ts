@@ -96,6 +96,7 @@ export const MOCK_USERS: User[] = [
     initialWeight: 70,
     totalPoints: 450,
     totalWeightLoss: 2.1,
+    isAdmin: false,
     history: [
       { id: 'h4', date: '2024-05-01', weight: 70, delta: 0, points: 0 },
       { id: 'h5', date: '2024-05-08', weight: 69.5, delta: -0.5, points: 100 },
@@ -110,6 +111,7 @@ export const MOCK_USERS: User[] = [
     initialWeight: 95,
     totalPoints: 120,
     totalWeightLoss: 0.5,
+    isAdmin: false,
     history: [
       { id: 'h7', date: '2024-05-01', weight: 95, delta: 0, points: 0 },
       { id: 'h8', date: '2024-05-08', weight: 95.5, delta: 0.5, points: -75 },
