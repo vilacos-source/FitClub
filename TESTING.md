@@ -73,7 +73,7 @@ mejorar conjuntamente.
   servicio Gemini si no se va a usar.
 - **Cubierto por:** smoke test **S6** (filtra este aviso como no fatal).
 
-### INC-007 — Cualquier usuario podía leer los nombres reales y los pesos de todos 🟢 (código listo, pendiente publicar reglas)
+### INC-007 — Cualquier usuario podía leer los nombres reales y los pesos de todos ✅ resuelto
 - **Síntoma:** una cuenta recién creada, sin perfil y sin permisos, podía descargar
   el nombre real, el peso inicial y el historial de pesajes de todo el grupo.
 - **Reproducido:** sí, con el SDK real de Firestore (ver `tests/e2e/privacy.spec.ts`).
