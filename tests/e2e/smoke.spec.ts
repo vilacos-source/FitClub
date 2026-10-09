@@ -1,0 +1,197 @@
+import { test, expect, ConsoleMessage, Page } from '@playwright/test';
+
+/**
+ * Batería de smoke tests de FitClub.
+ *
+ * Objetivo: en cada despliegue detectar si rompemos funcionalidad fundamental.
+ * Cada test imprime un diagnóstico claro (código de error Firebase incluido)
+ * para que el feedback sea accionable.
+ *
+ * NOTA: no usar `waitUntil: 'networkidle'` — la app abre un stream persistente
+ * de Firestore y networkidle nunca se cumple (cuelga el test).
+ */
+
+const KNOWN_FIREBASE_ERRORS: Record<string, string> = {
+  'auth/operation-not-allowed':
+    'El proveedor Email/Password está DESHABILITADO en Firebase Console → Authentication → Sign-in method. Actívalo.',
+  'auth/unauthorized-domain':
+    'El dominio publicado NO está en Firebase Console → Authentication → Settings → Authorized domains.',
+  'auth/email-already-in-use':
+    'Ese email ya tiene cuenta (esperado si el test se re-ejecuta).',
+  'auth/weak-password':
+    'Firebase rechaza la contraseña por débil (mínimo 6 caracteres).',
+};
+
+function diagnose(raw: string): string {
+  for (const [code, hint] of Object.entries(KNOWN_FIREBASE_ERRORS)) {
+    if (raw.includes(code)) return `${code} → ${hint}`;
+  }
+  return raw || '(sin mensaje)';
+}
+
+/** Carga la app y espera a que React monte el landing. */
+async function loadApp(page: Page) {
+  await gotoApp(page);
+  await page.waitForFunction(
+    () => {
+      const root = document.getElementById('root');
+      return !!root && root.children.length > 0;
+    },
+    { timeout: 30_000 },
+  );
+}
+
+/**
+ * Navega a la app.
+ *
+ * OJO: usar la URL COMPLETA, no `page.goto('/')`. Playwright resuelve `'/'`
+ * contra el ORIGEN del baseURL e ignora el subpath, así que en un despliegue
+ * tipo GitHub Pages (`/FitClub/`) acaba en el dominio raíz y devuelve 404
+ * de GitHub Pages. Esto rompía toda la batería sin que la app tuviera nada roto.
+ */
+const APP_URL = process.env.BASE_URL || 'https://vilacos-source.github.io/FitClub/';
+
+function gotoApp(page: Page) {
+  return page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
+}
+
+async function collectErrors(page: Page) {
+  const errors: string[] = [];
+  page.on('console', (msg: ConsoleMessage) => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('pageerror', (err) => errors.push(err.message));
+  return errors;
+}
+
+test.describe('FitClub smoke tests', () => {
+  test('S1 - la app carga y renderiza el landing (no página en blanco)', async ({ page }) => {
+    const errors = await collectErrors(page);
+    const resp = await gotoApp(page);
+    expect(resp?.status(), 'El servidor no devolvió 200').toBeLessThan(400);
+
+    const root = page.locator('#root');
+    await expect(root).toBeVisible();
+    await expect
+      .poll(async () => await root.locator('> *').count(), {
+        message: 'El root está vacío: la app no montó (¿assets 404 / base path?)',
+        timeout: 25_000,
+      })
+      .toBeGreaterThan(0);
+
+    await expect(page.getByText('FitClub', { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Empezar el Reto/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Ya tengo cuenta/i })).toBeVisible();
+
+    const fatal = errors.filter((e) => /Failed to load module|MIME type/i.test(e));
+    expect(fatal, `Errores de carga de assets:\n${fatal.join('\n')}`).toHaveLength(0);
+  });
+
+  test('S2 - el formulario de registro se abre y tiene todos los campos', async ({ page }) => {
+    await loadApp(page);
+    await page.getByRole('button', { name: /Empezar el Reto/i }).click();
+
+    await expect(page.getByText(/Crea tu perfil/i)).toBeVisible();
+    await expect(page.getByPlaceholder('Email')).toBeVisible();
+    await expect(page.getByPlaceholder('Contraseña')).toBeVisible();
+    await expect(page.getByPlaceholder(/nombre real/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/Pseudónimo/i)).toBeVisible();
+    await expect(page.getByPlaceholder(/Peso inicial/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Unirme al grupo/i })).toBeVisible();
+  });
+
+  test('S3 - el registro de un usuario nuevo funciona de verdad', async ({ page }) => {
+    const errors = await collectErrors(page);
+    const dialogs: string[] = [];
+    page.on('dialog', async (d) => {
+      dialogs.push(d.message());
+      await d.dismiss();
+    });
+
+    await loadApp(page);
+    await page.getByRole('button', { name: /Empezar el Reto/i }).click();
+
+    const stamp = Date.now();
+    await page.getByPlaceholder('Email').fill(`smoke+${stamp}@example.com`);
+    await page.getByPlaceholder('Contraseña').fill('Prueba12345!');
+    await page.getByPlaceholder(/nombre real/i).fill('Smoke Test');
+    await page.getByPlaceholder(/Pseudónimo/i).fill(`smoke${String(stamp).slice(-6)}`);
+    await page.getByPlaceholder(/Peso inicial/i).fill('85');
+    await page.getByRole('button', { name: /Unirme al grupo/i }).click();
+
+    // Esperamos a que aparezca CUALQUIERA de las dos señales:
+    //  - éxito: entramos al dashboard (cambia el texto)
+    //  - error: salta un diálogo (que ya estamos capturando)
+    // Así un fallo se reporta al instante en vez de agotar el timeout entero.
+    await Promise.race([
+      page.waitForFunction(
+        () => /Registrar peso|Ranking|Ajustes|Dashboard/i.test(document.body.innerText),
+        { timeout: 20_000 },
+      ).catch(() => {}),
+      page.waitForFunction(() => (window as any).__smokeDone === true, { timeout: 20_000 }).catch(() => {}),
+      page.waitForTimeout(20_000),
+    ]);
+
+    const dialogText = dialogs.join(' | ');
+    let bodyText = '';
+    try {
+      bodyText = await page.locator('body').innerText();
+    } catch {
+      bodyText = '';
+    }
+    const registered = !dialogText && /Registrar peso|Ranking|Ajustes|Dashboard/i.test(bodyText);
+
+    expect(
+      registered,
+      `El registro NO completó.\n` +
+        `Diálogo: ${dialogText || '(ninguno)'}\n` +
+        `Errores consola: ${errors.slice(-3).join(' | ') || '(ninguno)'}\n` +
+        `Diagnóstico: ${diagnose(dialogText || errors.slice(-3).join(' '))}`,
+    ).toBe(true);
+  });
+
+  test('S4 - login con credenciales inexistentes da error controlado (no cuelga)', async ({ page }) => {
+    const dialogs: string[] = [];
+    page.on('dialog', async (d) => {
+      dialogs.push(d.message());
+      await d.dismiss();
+    });
+
+    await loadApp(page);
+    await page.getByRole('button', { name: /Ya tengo cuenta/i }).click();
+    await expect(page.getByText(/Bienvenido de nuevo/i)).toBeVisible();
+
+    await page.getByPlaceholder('Email').fill(`no.existe.${Date.now()}@example.com`);
+    await page.getByPlaceholder('Contraseña').fill('Prueba12345!');
+    await page.getByRole('button', { name: /Entrar|Acceder|Iniciar/i }).click();
+
+    await page.waitForTimeout(9_000);
+    expect(
+      dialogs.length,
+      'El login con credenciales malas no dio ningún error visible (se queda mudo)',
+    ).toBeGreaterThan(0);
+  });
+
+  test('S5 - la app no se queda en spinner infinito', async ({ page }) => {
+    await gotoApp(page);
+    await page.waitForTimeout(8_000);
+
+    const html = await page.locator('body').innerText();
+    const spinners = await page.locator('.animate-spin').count();
+    const spinnerOnly = /^\s*$/.test(html.trim()) && spinners > 0;
+
+    expect(spinnerOnly, 'La app se quedó en spinner infinito (bloqueo por settings/competition)').toBe(false);
+    await expect(page.getByText(/FitClub/i).first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('S6 - no hay errores fatales en la consola al cargar', async ({ page }) => {
+    const errors = await collectErrors(page);
+    await loadApp(page);
+    await page.waitForTimeout(4_000);
+
+    const fatal = errors.filter(
+      (e) => !/API key should be set/i.test(e) && !/React DevTools/i.test(e),
+    );
+    expect(fatal, `Errores en consola:\n${fatal.join('\n')}`).toHaveLength(0);
+  });
+});

@@ -26,6 +26,16 @@ import {
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Home, Trophy, BookOpen, Settings } from 'lucide-react';
 
+/**
+ * Emails con permisos de administrador.
+ *
+ * Debe coincidir con la lista `adminEmails()` de `firestore.rules`.
+ * Las reglas de Firestore no permiten que un usuario se auto-nombre admin
+ * (sería una escalada de privilegios), así que serlo se decide por esta lista.
+ * Debe coincidir también con `ADMIN_EMAILS` en `services/firebase.ts`.
+ */
+const ADMIN_EMAILS = ['vilacos@gmail.com'];
+
 type View = 'dashboard' | 'leaderboard' | 'rules' | 'admin' | 'welcome';
 
 const App: React.FC = () => {
@@ -71,19 +81,26 @@ const App: React.FC = () => {
 
   // 2. Escuchar Ranking y Configuración en tiempo real
   useEffect(() => {
-    // Escuchar Configuración del Reto (Público)
+    // Escuchar Configuración del Reto (Público).
+    // Si el documento no existe usamos un valor por defecto local: la app NUNCA
+    // debe quedarse bloqueada esperando algo que puede no existir todavía.
+    const defaultConfig: CompetitionConfig = {
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      prizeDescription: "Configura el premio en ajustes",
+    };
+
     const unsubConfig = onSnapshot(doc(db, "settings", "competition"), (docSnap) => {
       if (docSnap.exists()) {
         setCompetitionConfig(docSnap.data() as CompetitionConfig);
       } else {
-        setCompetitionConfig({
-          startDate: new Date().toISOString().split('T')[0],
-          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          prizeDescription: "Configura el premio en ajustes"
-        });
+        setCompetitionConfig(defaultConfig);
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, "settings/competition");
+      // Un fallo de lectura de la config NO debe tumbar la app: usamos el
+      // valor por defecto y dejamos el diagnóstico en consola.
+      console.error("No se pudo leer settings/competition, usando valores por defecto:", error);
+      setCompetitionConfig(defaultConfig);
     });
 
     let unsubUsers = () => {};
@@ -198,7 +215,11 @@ const App: React.FC = () => {
       history: [],
       totalPoints: 0,
       totalWeightLoss: 0,
-      isAdmin: users.length === 0 // El primero en entrar es Admin
+      // Ser admin se decide por el email de la cuenta (ver ADMIN_EMAILS).
+      // Antes era `users.length === 0`, que no funcionaba: `users` solo se
+      // rellena para usuarios ya logueados, así que nunca valía 0 en el
+      // primer registro y el admin no se creaba nunca.
+      isAdmin: ADMIN_EMAILS.includes(auth.currentUser?.email ?? '')
     };
 
     if (auth.currentUser) {

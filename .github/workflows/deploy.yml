@@ -44,3 +44,29 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  smoke-tests:
+    # Corre DESPUÉS de desplegar, contra la web real ya publicada.
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Batería de smoke tests contra el despliegue
+        run: npx playwright test --reporter=list
+        env:
+          BASE_URL: https://vilacos-source.github.io/FitClub/
+      - name: Publicar informe de resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-report
+          path: |
+            test-reports/
+            test-results/
+          retention-days: 30

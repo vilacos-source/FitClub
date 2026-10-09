@@ -15,10 +15,15 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Lista de administradores por email. Debe coincidir con ADMIN_EMAILS
+    // en App.tsx. Ser admin se decide AQUÍ (no por un campo que el propio
+    // usuario pueda escribir: eso sería escalada de privilegios).
+    function adminEmails() {
+      return ['vilacos@gmail.com'];
+    }
+
     function isAdmin() {
-      return isSignedIn() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true || 
-         request.auth.token.email == 'vilacos@gmail.com');
+      return isSignedIn() && request.auth.token.email in adminEmails();
     }
 
     function isValidId(id) {
@@ -66,7 +71,7 @@ service cloud.firestore {
 
       allow create: if isOwner(userId) && 
                       isValidUser(incoming()) && 
-                      incoming().isAdmin == (incoming().isAdmin == true ? isAdmin() : false); // Only admins can create other admins
+                      incoming().isAdmin == isAdmin(); // El campo isAdmin debe reflejar la lista real
 
       allow update: if isSignedIn() && (
         // Admin update
