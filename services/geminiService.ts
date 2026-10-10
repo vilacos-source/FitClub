@@ -2,7 +2,44 @@
 import { GoogleGenAI } from "@google/genai";
 import { User, PublicProfile } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+/**
+ * Cliente de Gemini PEREZOSO y tolerante a fallos.
+ *
+ * Antes se creaba en el nivel del módulo:
+ *     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+ * Si la clave falta —por ejemplo en un despliegue donde el secret no está
+ * configurado— el constructor LANZA, el módulo no llega a evaluarse y se lleva
+ * por delante todo el árbol de imports: la aplicación se queda en blanco.
+ *
+ * Esto solo sirve para los mensajes motivacionales, que son un adorno: nunca
+ * deben poder tumbar la app. Sin clave, se usan los mensajes por defecto.
+ */
+let ai: GoogleGenAI | null = null;
+let aiYaIntentado = false;
+
+const getAi = (): GoogleGenAI | null => {
+  if (aiYaIntentado) return ai;
+  aiYaIntentado = true;
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.warn(
+      "GEMINI_API_KEY no configurada: se usarán los mensajes motivacionales por defecto.",
+    );
+    return null;
+  }
+
+  try {
+    ai = new GoogleGenAI({ apiKey });
+  } catch (error: unknown) {
+    console.warn(
+      "No se pudo inicializar Gemini, se usarán los mensajes por defecto:",
+      error instanceof Error ? error.message : String(error),
+    );
+    ai = null;
+  }
+  return ai;
+};
 
 const DEFAULT_MOTIVATIONAL = [
   "¡A tope {name}! ¡Dale caña que tú puedes! 💪",
@@ -48,18 +85,22 @@ export const getMotivationalMessage = async (user: User, leaderboard: PublicProf
     - NUNCA menciones kilos exactos ni seas formal.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-    });
-    return response.text;
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn("Gemini API Error (likely quota):", message);
-    const randomFallback = DEFAULT_MOTIVATIONAL[Math.floor(Math.random() * DEFAULT_MOTIVATIONAL.length)];
-    return replacePlaceholders(randomFallback, user);
+  const client = getAi();
+  if (client) {
+    try {
+      const response = await client.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+      });
+      if (response.text) return response.text;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn("Gemini API Error (likely quota):", message);
+    }
   }
+
+  const randomFallback = DEFAULT_MOTIVATIONAL[Math.floor(Math.random() * DEFAULT_MOTIVATIONAL.length)];
+  return replacePlaceholders(randomFallback, user);
 };
 
 export const getWelcomeMessage = async (user: User) => {
@@ -77,16 +118,20 @@ export const getWelcomeMessage = async (user: User) => {
     - Usa emojis de comida o deporte.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-    });
-    return response.text;
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn("Gemini API Welcome Error:", message);
-    const randomFallback = DEFAULT_WELCOME[Math.floor(Math.random() * DEFAULT_WELCOME.length)];
-    return replacePlaceholders(randomFallback, user);
+  const client = getAi();
+  if (client) {
+    try {
+      const response = await client.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+      });
+      if (response.text) return response.text;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn("Gemini API Welcome Error:", message);
+    }
   }
+
+  const randomFallback = DEFAULT_WELCOME[Math.floor(Math.random() * DEFAULT_WELCOME.length)];
+  return replacePlaceholders(randomFallback, user);
 };

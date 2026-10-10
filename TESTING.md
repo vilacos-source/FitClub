@@ -89,6 +89,24 @@ mejorar conjuntamente.
   El admin obtiene los nombres reales aparte, leyendo la colección privada.
 - **Cubierto por:** smoke tests **S7a–S7f**.
 
+### INC-008 — La web publicada se quedaba en blanco (faltaba la clave de Gemini) ✅ resuelto
+- **Síntoma:** la página cargaba pero no se veía nada: ni landing, ni texto, ni error.
+  El HTML llegaba bien (200) y el JS también (200), pero React no montaba.
+- **Reproducido:** sí. Importando el bundle desplegado a mano salía el error real:
+  `Error: An API Key must be set when running in a browser`.
+- **Causa raíz:** `services/geminiService.ts` creaba el cliente en el **nivel del
+  módulo**: `const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })`.
+  En CI, `GEMINI_API_KEY` no está configurada, así que el `define` de Vite la
+  sustituye por `undefined`; el constructor lanza, el módulo no llega a
+  evaluarse y se cae todo el árbol de imports que cuelga de él.
+  Un adorno (los mensajes motivacionales) tumbaba la aplicación entera.
+- **Solución:** inicialización **perezosa** y tolerante a fallos. Si no hay clave
+  o falla la creación del cliente, se avisa por consola y se usan los mensajes
+  por defecto; la app arranca igual.
+- **Cubierto por:** smoke test **S1** (la app carga y renderiza, no página en blanco).
+- **Lección:** nunca crear clientes de servicios externos en el nivel del módulo
+  de algo que importa la app; hacerlo dentro de la función y envuelto en try/catch.
+
 ---
 
 ## Batería de smoke tests
