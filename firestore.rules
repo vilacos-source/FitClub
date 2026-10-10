@@ -83,7 +83,9 @@ service cloud.firestore {
                        incoming().diff(existing()).affectedKeys().hasOnly(['totalPoints', 'totalWeightLoss', 'pseudonym', 'avatar']))
                     );
 
-      allow delete: if isAdmin();
+      // El dueño puede borrarse a sí mismo (derecho de supresión y, de paso,
+      // permite que los tests se limpien solos al terminar).
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     // ==========================================================
@@ -102,7 +104,8 @@ service cloud.firestore {
                       (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['history']))
                     );
 
-      allow delete: if isAdmin();
+      // El dueño puede borrar sus propios datos.
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     // ==========================================================

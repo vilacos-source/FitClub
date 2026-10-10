@@ -8,10 +8,12 @@ import {
   doc,
   getDoc,
   setDoc,
+  deleteDoc,
   Firestore,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { deleteTestAccount, newTestAccount } from './helpers/cleanup';
 
 /**
  * Test de regresión de PRIVACIDAD (no necesita navegador: habla directamente
@@ -56,6 +58,7 @@ test.describe('Privacidad de datos personales', () => {
   let auth: Auth;
   let db: Firestore;
   let myUid: string;
+  const account = newTestAccount('privacy');
 
   test.beforeAll(async () => {
     app = initializeApp(cfg, `privacy-${Date.now()}`);
@@ -66,8 +69,8 @@ test.describe('Privacidad de datos personales', () => {
     // persona que se registre por su cuenta.
     const cred = await createUserWithEmailAndPassword(
       auth,
-      `privacy${Date.now()}@example.com`,
-      'Prueba12345!',
+      account.email,
+      account.password,
     );
     myUid = cred.user.uid;
   });
@@ -79,6 +82,8 @@ test.describe('Privacidad de datos personales', () => {
       /* da igual */
     }
     await deleteApp(app);
+    // Autolimpieza: sin esto, cada ejecución dejaría una cuenta acumulada.
+    await deleteTestAccount(account.email, account.password);
   });
 
   test('S7a - el ranking se puede leer pero no contiene datos personales', async () => {
@@ -143,5 +148,31 @@ test.describe('Privacidad de datos personales', () => {
       }),
       'Escribir la configuración del reto',
     );
+  });
+
+  test('S7g - cada usuario puede borrar sus propios datos', async () => {
+    // Necesario para el derecho de supresión y para que los tests se limpien
+    // solos (ver tests/e2e/helpers/cleanup.ts).
+    //
+    // OJO al orden: S7d ya ha creado este documento, así que hay que partir de
+    // un estado limpio. Si no, el `setDoc` de abajo sería una MODIFICACIÓN, y la
+    // regla de update solo deja al dueño tocar `history` — cambiar `realName`
+    // está prohibido a propósito. Eso daba un permission-denied que parecía un
+    // fallo de la regla de borrado cuando en realidad era del test.
+    const docRef = doc(db, PRIVATE_COLLECTION, myUid);
+
+    try {
+      await deleteDoc(docRef);
+    } catch {
+      /* no existía: es lo normal */
+    }
+
+    await setDoc(docRef, { realName: 'Nombre A Borrar', history: [] });
+    const antes = await getDoc(docRef);
+    expect(antes.exists(), 'El documento debería existir antes de borrarlo').toBe(true);
+
+    await deleteDoc(docRef);
+    const despues = await getDoc(docRef);
+    expect(despues.exists(), 'El documento debería haberse borrado').toBe(false);
   });
 });

@@ -115,6 +115,11 @@ npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview
 | S7d | Cada usuario sí puede leer y escribir sus propios datos privados | ✅ |
 | S7e | Nadie puede auto-ascenderse a administrador | ✅ |
 | S7f | Un usuario normal no puede escribir la configuración del reto | ✅ |
+| S7g | Cada usuario puede borrar sus propios datos | ✅ |
+
+Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
+`tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada
+despliegue.
 
 El informe de cada ejecución queda como artefacto `smoke-test-report` en la
 pestaña **Actions** del repositorio (30 días de retención).

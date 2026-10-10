@@ -1,4 +1,5 @@
 import { test, expect, ConsoleMessage, Page } from '@playwright/test';
+import { deleteTestAccount } from './helpers/cleanup';
 
 /**
  * Batería de smoke tests de FitClub.
@@ -108,46 +109,55 @@ test.describe('FitClub smoke tests', () => {
       await d.dismiss();
     });
 
-    await loadApp(page);
-    await page.getByRole('button', { name: /Empezar el Reto/i }).click();
+    // Cuenta de prueba con identificador único para esta ejecución.
+    const email = `smoke+${Date.now()}@example.com`;
+    const password = 'Prueba12345!';
 
-    const stamp = Date.now();
-    await page.getByPlaceholder('Email').fill(`smoke+${stamp}@example.com`);
-    await page.getByPlaceholder('Contraseña').fill('Prueba12345!');
-    await page.getByPlaceholder(/nombre real/i).fill('Smoke Test');
-    await page.getByPlaceholder(/Pseudónimo/i).fill(`smoke${String(stamp).slice(-6)}`);
-    await page.getByPlaceholder(/Peso inicial/i).fill('85');
-    await page.getByRole('button', { name: /Unirme al grupo/i }).click();
-
-    // Esperamos a que aparezca CUALQUIERA de las dos señales:
-    //  - éxito: entramos al dashboard (cambia el texto)
-    //  - error: salta un diálogo (que ya estamos capturando)
-    // Así un fallo se reporta al instante en vez de agotar el timeout entero.
-    await Promise.race([
-      page.waitForFunction(
-        () => /Registrar peso|Ranking|Ajustes|Dashboard/i.test(document.body.innerText),
-        { timeout: 20_000 },
-      ).catch(() => {}),
-      page.waitForFunction(() => (window as any).__smokeDone === true, { timeout: 20_000 }).catch(() => {}),
-      page.waitForTimeout(20_000),
-    ]);
-
-    const dialogText = dialogs.join(' | ');
-    let bodyText = '';
     try {
-      bodyText = await page.locator('body').innerText();
-    } catch {
-      bodyText = '';
-    }
-    const registered = !dialogText && /Registrar peso|Ranking|Ajustes|Dashboard/i.test(bodyText);
+      await loadApp(page);
+      await page.getByRole('button', { name: /Empezar el Reto/i }).click();
 
-    expect(
-      registered,
-      `El registro NO completó.\n` +
-        `Diálogo: ${dialogText || '(ninguno)'}\n` +
-        `Errores consola: ${errors.slice(-3).join(' | ') || '(ninguno)'}\n` +
-        `Diagnóstico: ${diagnose(dialogText || errors.slice(-3).join(' '))}`,
-    ).toBe(true);
+      await page.getByPlaceholder('Email').fill(email);
+      await page.getByPlaceholder('Contraseña').fill(password);
+      await page.getByPlaceholder(/nombre real/i).fill('Smoke Test');
+      await page.getByPlaceholder(/Pseudónimo/i).fill(`smoke${String(Date.now()).slice(-6)}`);
+      await page.getByPlaceholder(/Peso inicial/i).fill('85');
+      await page.getByRole('button', { name: /Unirme al grupo/i }).click();
+
+      // Esperamos a que aparezca CUALQUIERA de las dos señales:
+      //  - éxito: entramos al dashboard (cambia el texto)
+      //  - error: salta un diálogo (que ya estamos capturando)
+      // Así un fallo se reporta al instante en vez de agotar el timeout entero.
+      await Promise.race([
+        page.waitForFunction(
+          () => /Registrar peso|Ranking|Ajustes|Dashboard/i.test(document.body.innerText),
+          { timeout: 20_000 },
+        ).catch(() => {}),
+        page.waitForFunction(() => (window as any).__smokeDone === true, { timeout: 20_000 }).catch(() => {}),
+        page.waitForTimeout(20_000),
+      ]);
+
+      const dialogText = dialogs.join(' | ');
+      let bodyText = '';
+      try {
+        bodyText = await page.locator('body').innerText();
+      } catch {
+        bodyText = '';
+      }
+      const registered = !dialogText && /Registrar peso|Ranking|Ajustes|Dashboard/i.test(bodyText);
+
+      expect(
+        registered,
+        `El registro NO completó.\n` +
+          `Diálogo: ${dialogText || '(ninguno)'}\n` +
+          `Errores consola: ${errors.slice(-3).join(' | ') || '(ninguno)'}\n` +
+          `Diagnóstico: ${diagnose(dialogText || errors.slice(-3).join(' '))}`,
+      ).toBe(true);
+    } finally {
+      // Autolimpieza: sin esto, cada despliegue dejaría una cuenta de prueba
+      // acumulada en el proyecto.
+      await deleteTestAccount(email, password);
+    }
   });
 
   test('S4 - login con credenciales inexistentes da error controlado (no cuelga)', async ({ page }) => {
