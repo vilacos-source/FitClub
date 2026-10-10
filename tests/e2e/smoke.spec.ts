@@ -297,6 +297,37 @@ test.describe('FitClub smoke tests', () => {
     expect(datos.buildId.length, 'version.json trae un buildId vacío').toBeGreaterThan(0);
   });
 
+  test('S11 - si hay una version nueva publicada, la app se recarga sola', async ({ page }) => {
+    // El otro extremo de INC-012. S10 comprueba que version.json se publica;
+    // este comprueba que la app REACCIONA a que el id cambie y se recarga sola,
+    // sin que el usuario toque nada. Sin esto, la pantalla en blanco por caché
+    // volvería sin que nadie se enterase hasta que le pasara a un participante.
+    await loadApp(page);
+    await expect(page.getByRole('button', { name: /Empezar el Reto/i })).toBeVisible({ timeout: 20_000 });
+
+    // Simulamos que se ha publicado una versión distinta de la que tenemos.
+    const ID_NUEVO = 'version-simulada-para-el-test';
+    await page.route('**/version.json*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ buildId: ID_NUEVO }),
+      }),
+    );
+
+    // El aviso salta al volver a la pestaña; eso es exactamente lo que hace un
+    // usuario real que tenía la app abierta cuando publicamos.
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+
+    // Tiene que recargarse añadiendo el parámetro que rompe la caché. Si el
+    // parámetro no aparece, la recarga no serviría: el navegador volvería a
+    // darle el index.html viejo de la caché y seguiría en blanco.
+    await page.waitForURL(new RegExp(`[?&]v=${ID_NUEVO}`), { timeout: 15_000 });
+
+    // Dejamos de simular para que la app no entre en bucle de recargas.
+    await page.unroute('**/version.json*');
+  });
+
   test('S4 - login con credenciales inexistentes da error controlado (no cuelga)', async ({ page }) => {
     const dialogs: string[] = [];
     page.on('dialog', async (d) => {
