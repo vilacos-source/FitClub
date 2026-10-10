@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FitClub — propuestas de diseño</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Inter, -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: #dfe5ee; padding: 24px 18px 28px; color: #0f172a;
+  }
+  h1 { font-size: 18px; letter-spacing: -.02em; text-align: center; margin-bottom: 3px; }
+  .sub { text-align: center; font-size: 12px; color: #52627a; margin-bottom: 22px; }
+  .row { display: flex; gap: 24px; justify-content: center; align-items: flex-start; }
+  .col { width: 388px; }
+  .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em;
+           margin-bottom: 8px; color: #475569; }
+  .label b { display: block; font-size: 13.5px; text-transform: none; letter-spacing: -.01em;
+             color: #0f172a; margin-top: 2px; }
+  .phone { border-radius: 24px; overflow: hidden; display: flex; flex-direction: column;
+           height: 612px; position: relative; }
+
+  .topbar { display: flex; align-items: center; gap: 9px; padding: 13px 15px 9px; }
+  .logo { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+          font-weight: 800; font-size: 14px; color: #fff; }
+  .brand { font-weight: 800; font-size: 15px; letter-spacing: -.02em; }
+  .who { margin-left: auto; text-align: right; line-height: 1.15; }
+  .who small { display: block; font-size: 10px; opacity: .62; }
+  .who span { font-size: 12.5px; font-weight: 700; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
+  .avatar svg { width: 17px; height: 17px; }
+  .body { flex: 1; padding: 4px 13px 14px; }
+
+  .coach { border-radius: 17px; padding: 14px 15px 13px; color: #fff; }
+  .coach .head { display: flex; align-items: center; }
+  .coach .kicker { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; opacity: .85; }
+  .coach .days { margin-left: auto; font-size: 9.5px; font-weight: 700; opacity: .92;
+                 border: 1px solid rgba(255,255,255,.45); border-radius: 20px; padding: 2px 7px; }
+  .coach p { font-size: 14px; line-height: 1.38; margin: 9px 0 13px; font-weight: 500; }
+  .stats { display: flex; gap: 9px; }
+  .stat { flex: 1; background: rgba(255,255,255,.18); border-radius: 11px; padding: 8px 10px; }
+  .stat small { display: block; font-size: 8.5px; letter-spacing: .08em; text-transform: uppercase;
+                opacity: .82; font-weight: 700; }
+  .stat b { font-size: 18px; letter-spacing: -.02em; }
+  .stat b i { font-size: 10.5px; font-style: normal; font-weight: 600; opacity: .85; }
+
+  .cta { width: 100%; border: 0; border-radius: 14px; padding: 14px; font-size: 14px;
+         font-weight: 800; font-family: inherit; margin: 12px 0 11px; cursor: pointer; }
+
+  .hist { border-radius: 15px; padding: 13px 14px 12px; }
+  .hist h3 { font-size: 12.5px; font-weight: 800; letter-spacing: -.01em; }
+  .hist .hint { font-size: 10px; opacity: .62; margin: 1px 0 12px; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 66px;
+          border-bottom: 1px solid rgba(120,134,156,.28); padding-bottom: 1px; }
+  .bars span { flex: 1; border-radius: 4px 4px 0 0; }
+  .axis { display: flex; gap: 6px; margin-top: 6px; }
+  .axis span { flex: 1; text-align: center; font-size: 8px; opacity: .6; }
+
+  .last { border-radius: 14px; padding: 11px 14px; margin-top: 11px; display: flex; align-items: center; }
+  .last small { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; opacity: .62;
+                font-weight: 700; display: block; }
+  .last b { font-size: 15px; letter-spacing: -.02em; }
+  .last .chip { margin-left: auto; font-size: 10px; font-weight: 800; border-radius: 20px; padding: 4px 9px; }
+
+  .nav { position: absolute; bottom: 0; left: 0; right: 0; display: flex; padding: 8px 6px 11px; }
+  .nav div { flex: 1; text-align: center; font-size: 8.5px; font-weight: 800;
+             text-transform: uppercase; letter-spacing: .07em; }
+  .nav div svg { display: block; width: 17px; height: 17px; margin: 0 auto 3px; }
+
+  /* ================= OPCIÓN 1 — Conservador ================= */
+  .v1 { background: #e9eff7; }
+  .v1 .logo { background: #4f46e5; }
+  .v1 .brand, .v1 .who small, .v1 .who span { color: #1e293b; }
+  .v1 .coach { background: linear-gradient(135deg, #4f46e5, #6d28d9); }
+  .v1 .avatar { background: #fde68a; color: #78350f; border: 2px solid #fff; }
+  .v1 .cta { background: #1e293b; color: #fff; }
+  .v1 .hist, .v1 .last { background: #fff; border: 1px solid #d7dfea; box-shadow: 0 1px 3px rgba(15,23,42,.1); }
+  .v1 .hist h3 { color: #1e293b; } .v1 .hist .hint, .v1 .axis span { color: #64748b; }
+  .v1 .bars span { background: #c7d2fe; } .v1 .bars span:nth-child(3) { background: #4f46e5; }
+  .v1 .last small { color: #64748b; } .v1 .last b { color: #1e293b; }
+  .v1 .last .chip { background: #dcfce7; color: #15803d; }
+  .v1 .nav { background: #fff; border-top: 1px solid #d7dfea; }
+  .v1 .nav div { color: #64748b; } .v1 .nav div.on { color: #4f46e5; }
+
+  /* ================= OPCIÓN 2 — Recomendada ================= */
+  .v2 { background: linear-gradient(168deg, #e7ebff 0%, #f2eaff 56%, #e4f1ff 100%); }
+  .v2 .logo { background: linear-gradient(140deg, #4f46e5, #7c3aed); box-shadow: 0 4px 12px -3px rgba(79,70,229,.65); }
+  .v2 .brand { color: #211c47; } .v2 .who small { color: #6b7280; } .v2 .who span { color: #211c47; }
+  .v2 .avatar { background: #f3f0ff; border: 2px solid rgba(109,40,217,.65); color: #5b21b6;
+                box-shadow: 0 4px 12px -4px rgba(124,58,237,.5); }
+  .v2 .coach { background: linear-gradient(135deg, #4f46e5, #7c3aed 58%, #a21caf);
+               box-shadow: 0 16px 32px -15px rgba(79,70,229,.8); }
+  .v2 .cta { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff;
+             box-shadow: 0 12px 24px -11px rgba(79,70,229,.9); }
+  .v2 .hist { background: #fff; border: 1px solid rgba(124,58,237,.16);
+              box-shadow: 0 14px 28px -16px rgba(76,71,140,.6); }
+  .v2 .hist h3 { color: #211c47; } .v2 .hist .hint { color: #6b7280; } .v2 .axis span { color: #9aa3b2; }
+  .v2 .bars span { background: #ddd6fe; } .v2 .bars span:nth-child(3) { background: #7c3aed; }
+  .v2 .last { background: #fff; border: 1px solid rgba(124,58,237,.16);
+              box-shadow: 0 14px 28px -16px rgba(76,71,140,.6); }
+  .v2 .last small { color: #6b7280; } .v2 .last b { color: #211c47; }
+  .v2 .last .chip { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; }
+  .v2 .nav { background: rgba(255,255,255,.88); border-top: 1px solid rgba(124,58,237,.16); }
+  .v2 .nav div { color: #6b7280; } .v2 .nav div.on { color: #6d28d9; }
+
+  /* ================= OPCIÓN 3 — Noche ================= */
+  .v3 { background: radial-gradient(120% 90% at 15% 0%, #17233d 0%, #0b1220 55%, #080d18 100%); }
+  .v3 .logo { background: linear-gradient(140deg, #22d3ee, #6366f1); }
+  .v3 .brand { color: #f1f5f9; } .v3 .who small { color: #8fa0b8; } .v3 .who span { color: #f1f5f9; }
+  .v3 .avatar { background: rgba(34,211,238,.18); border: 1px solid rgba(34,211,238,.45); color: #22d3ee; }
+  .v3 .coach { background: linear-gradient(135deg, #0e7490, #4f46e5 68%, #7c3aed);
+               box-shadow: 0 18px 38px -19px rgba(34,211,238,.75); }
+  .v3 .stat { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.1); }
+  .v3 .cta { background: linear-gradient(135deg, #22d3ee, #a3e635); color: #07111f; }
+  .v3 .hist, .v3 .last { background: rgba(148,163,184,.1); border: 1px solid rgba(148,163,184,.18); }
+  .v3 .hist h3, .v3 .last b { color: #e6edf7; }
+  .v3 .hist .hint, .v3 .axis span, .v3 .last small { color: #8fa0b8; }
+  .v3 .bars span { background: rgba(34,211,238,.28); } .v3 .bars span:nth-child(3) { background: #22d3ee; }
+  .v3 .last .chip { background: rgba(163,230,53,.18); color: #bef264; }
+  .v3 .nav { background: rgba(12,19,33,.96); border-top: 1px solid rgba(148,163,184,.3); }
+  .v3 .nav div { color: #8b9cb3; } .v3 .nav div.on { color: #22d3ee; }
+
+  /* En el móvil, tres paneles en fila no se ven: se apilan. */
+  @media (max-width: 1100px) {
+    body { padding: 16px 10px 24px; }
+    .row { flex-direction: column; align-items: center; gap: 30px; }
+    .col { width: 100%; max-width: 400px; }
+    h1 { font-size: 16px; }
+    .sub { font-size: 11.5px; margin-bottom: 18px; }
+  }
+  @media (min-width: 1101px) { .row { flex-wrap: nowrap; } }
+</style>
+</head>
+<body>
+  <h1>FitClub — tres direcciones para el mismo contenido</h1>
+  <p class="sub">Misma pantalla de Inicio, mismo contenido. Solo cambia el fondo y el tratamiento de las tarjetas.</p>
+
+  <div class="row">
+
+    <div class="col">
+      <div class="label">Opción 1 <b>Conservador — el arreglo mínimo</b></div>
+      <div class="phone v1">
+        <div class="topbar">
+          <div class="logo">F</div><div class="brand">FitClub</div>
+          <div class="who"><small>Hola,</small><span>Mona</span></div>
+          <div class="avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></div>
+        </div>
+        <div class="body">
+          <div class="coach">
+            <div class="head"><span class="kicker">Coach IA</span><span class="days">0/7 DÍAS</span></div>
+            <p>¡Vaya fichaje el de Mona! Esos 74 kg van a volar.</p>
+            <div class="stats">
+              <div class="stat"><small>Puntos finales</small><b>330 <i>pts</i></b></div>
+              <div class="stat"><small>Variación total</small><b>1.7 <i>kg</i></b></div>
+            </div>
+          </div>
+          <button class="cta">Registrar peso de hoy</button>
+          <div class="hist">
+            <h3>Tu Historial Visual</h3><div class="hint">Evolución de tu peso</div>
+            <div class="bars"><span style="height:46%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:66%"></span><span style="height:90%"></span></div>
+            <div class="axis"><span>S1</span><span>S2</span><span>S3</span><span>S4</span><span>Hoy</span></div>
+          </div>
+          <div class="last"><div><small>Último pesaje</small><b>72.3 kg</b></div><span class="chip">−1.7 kg</span></div>
+        </div>
+        <div class="nav">
+          <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H4v-1z"/><path d="M9 21v-6h6v6"/></svg>Inicio</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M12 13v4M8.5 20h7"/></svg>Ranking</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h13v16H5z"/><path d="M8 8h7M8 12h7M8 16h4"/></svg>Reglas</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="label">Opción 2 ★ <b>Recomendada — tarjetas que flotan</b></div>
+      <div class="phone v2">
+        <div class="topbar">
+          <div class="logo">F</div><div class="brand">FitClub</div>
+          <div class="who"><small>Hola,</small><span>Mona</span></div>
+          <div class="avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></div>
+        </div>
+        <div class="body">
+          <div class="coach">
+            <div class="head"><span class="kicker">Coach IA</span><span class="days">0/7 DÍAS</span></div>
+            <p>¡Vaya fichaje el de Mona! Esos 74 kg van a volar.</p>
+            <div class="stats">
+              <div class="stat"><small>Puntos finales</small><b>330 <i>pts</i></b></div>
+              <div class="stat"><small>Variación total</small><b>1.7 <i>kg</i></b></div>
+            </div>
+          </div>
+          <button class="cta">Registrar peso de hoy</button>
+          <div class="hist">
+            <h3>Tu Historial Visual</h3><div class="hint">Evolución de tu peso</div>
+            <div class="bars"><span style="height:46%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:66%"></span><span style="height:90%"></span></div>
+            <div class="axis"><span>S1</span><span>S2</span><span>S3</span><span>S4</span><span>Hoy</span></div>
+          </div>
+          <div class="last"><div><small>Último pesaje</small><b>72.3 kg</b></div><span class="chip">−1.7 kg</span></div>
+        </div>
+        <div class="nav">
+          <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H4v-1z"/><path d="M9 21v-6h6v6"/></svg>Inicio</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M12 13v4M8.5 20h7"/></svg>Ranking</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h13v16H5z"/><path d="M8 8h7M8 12h7M8 16h4"/></svg>Reglas</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="label">Opción 3 <b>Divergente — modo noche deportivo</b></div>
+      <div class="phone v3">
+        <div class="topbar">
+          <div class="logo">F</div><div class="brand">FitClub</div>
+          <div class="who"><small>Hola,</small><span>Mona</span></div>
+          <div class="avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></div>
+        </div>
+        <div class="body">
+          <div class="coach">
+            <div class="head"><span class="kicker">Coach IA</span><span class="days">0/7 DÍAS</span></div>
+            <p>¡Vaya fichaje el de Mona! Esos 74 kg van a volar.</p>
+            <div class="stats">
+              <div class="stat"><small>Puntos finales</small><b>330 <i>pts</i></b></div>
+              <div class="stat"><small>Variación total</small><b>1.7 <i>kg</i></b></div>
+            </div>
+          </div>
+          <button class="cta">Registrar peso de hoy</button>
+          <div class="hist">
+            <h3>Tu Historial Visual</h3><div class="hint">Evolución de tu peso</div>
+            <div class="bars"><span style="height:46%"></span><span style="height:60%"></span><span style="height:76%"></span><span style="height:66%"></span><span style="height:90%"></span></div>
+            <div class="axis"><span>S1</span><span>S2</span><span>S3</span><span>S4</span><span>Hoy</span></div>
+          </div>
+          <div class="last"><div><small>Último pesaje</small><b>72.3 kg</b></div><span class="chip">−1.7 kg</span></div>
+        </div>
+        <div class="nav">
+          <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H4v-1z"/><path d="M9 21v-6h6v6"/></svg>Inicio</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M12 13v4M8.5 20h7"/></svg>Ranking</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h13v16H5z"/><path d="M8 8h7M8 12h7M8 16h4"/></svg>Reglas</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
