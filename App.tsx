@@ -38,10 +38,27 @@ const ADMIN_EMAILS = ['vilacos@gmail.com'];
 
 type View = 'dashboard' | 'leaderboard' | 'rules' | 'admin' | 'welcome';
 
+// En qué pestaña estaba la app. Vive en `sessionStorage` a propósito:
+// - sobrevive a recargar la página, que es lo que pasa al abrirla de nuevo;
+// - se borra al cerrar la pestaña, así que no se hereda entre usuarios distintos
+//   en un mismo navegador compartido.
+const SESSION_VIEW_KEY = 'fitclub:view';
+
+/** Pestaña guardada, o `dashboard` (Inicio) si no hay ninguna válida. */
+const vistaInicial = (): View => {
+  try {
+    const v = sessionStorage.getItem(SESSION_VIEW_KEY);
+    const validas: View[] = ['dashboard', 'leaderboard', 'rules', 'admin'];
+    return validas.includes(v as View) ? (v as View) : 'dashboard';
+  } catch {
+    return 'dashboard';
+  }
+};
+
 const App: React.FC = () => {
   const [users, setUsers] = useState<PublicProfile[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeView, setActiveView] = useState<View>('dashboard');
+  const [activeView, setActiveView] = useState<View>(vistaInicial);
   const [isLoading, setIsLoading] = useState(true);
   const [competitionConfig, setCompetitionConfig] = useState<CompetitionConfig | null>(null);
   // Solo para administradores: mapa uid → nombre real, traído de la colección
@@ -87,6 +104,7 @@ const App: React.FC = () => {
       } else {
         setCurrentUser(null);
         setActiveView('welcome');
+        try { sessionStorage.removeItem(SESSION_VIEW_KEY); } catch { /* da igual */ }
       }
       setIsLoading(false);
     });
@@ -143,6 +161,13 @@ const App: React.FC = () => {
       unsubConfig();
     };
   }, [isLoading, auth.currentUser?.uid]); // Re-run when auth loading finishes or auth user changes
+
+  // 3. Recordar en qué pestaña está. Al recargar la app se vuelve a la misma,
+  // en vez de arrancar en una vista que no pinta nada.
+  useEffect(() => {
+    if (!currentUser) return;
+    try { sessionStorage.setItem(SESSION_VIEW_KEY, activeView); } catch { /* da igual */ }
+  }, [activeView, currentUser]);
 
   // 3. Solo para administradores: traer los nombres reales desde la colección
   // privada. Se hace aparte justamente porque NO pueden estar en el documento
@@ -291,6 +316,9 @@ const App: React.FC = () => {
       await setDoc(privateDataRef(uid), privateData);
       setCurrentUser({ id: uid, ...publicProfile, ...privateData });
       setActiveView('dashboard');
+      // La app quedó abierta en ESTA pestaña durante la sesión, así que al
+      // volver entra directamente en el panel en vez de en una pantalla vacía.
+      try { sessionStorage.setItem(SESSION_VIEW_KEY, 'dashboard'); } catch { /* da igual */ }
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, `users/${uid}`);
     }
@@ -306,6 +334,10 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
+    // Al salir, la app vuelve a empezar: la próxima persona que entre en este
+    // navegador no hereda la pestaña donde estaba la anterior.
+    try { sessionStorage.removeItem(SESSION_VIEW_KEY); } catch { /* da igual */ }
+    setActiveView('dashboard');
     signOut(auth);
   };
 

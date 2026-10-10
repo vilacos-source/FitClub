@@ -122,6 +122,27 @@ mejorar conjuntamente.
 - **Cubierto por:** smoke test **S3** (abre la confirmación, «Cancelar» te deja
   dentro, y solo al confirmar se cierra la sesión).
 
+### INC-010 — Al abrir la app no se veía nada hasta tocar una pestaña ✅ resuelto
+- **Síntoma:** al entrar con la sesión ya abierta, la pantalla aparecía **vacía**:
+  se veía la barra inferior, pero el contenido no. Hasta que pulsabas Inicio,
+  Ranking o Reglas no aparecía nada.
+- **Reproducido:** sí. Registrando una cuenta y recargando la página:
+  `document.querySelector('main').innerText.length === 0` con el código viejo.
+- **Causa raíz:** la vista inicial era `'dashboard'`… pero el efecto que deja la
+  sesión cerrada la pisaba con `'welcome'`. `'welcome'` es un valor válido del
+  tipo, así que **el compilador no lo detecta**, y al no haber ningún bloque que
+  pinte esa vista, el `<main>` se quedaba vacío. Solo se arreglaba al pulsar una
+  pestaña, que ya asignaba un valor pintable.
+- **Solución:** la vista inicial es **`'dashboard'` siempre**, y la pestaña elegida
+  se recuerda en `sessionStorage` para que recargar no te devuelva a la portada.
+  Si algo no cuadra, se cae a `'dashboard'`. Se borra al cerrar sesión, para que
+  en un navegador compartido nadie herede la pestaña del anterior.
+- **Cubierto por:** smoke test **S8** (tras recargar, el panel tiene que estar
+  visible sin tocar nada). Verificado que **falla** con el código antiguo.
+- **Lección:** una vista por defecto que *parece* inofensiva puede dejar la
+  pantalla en blanco si ninguna rama la pinta. Nunca uses como estado inicial un
+  valor que el render no cubre — y si el valor existe, cubrirlo o eliminarlo.
+
 ---
 
 ## Batería de smoke tests

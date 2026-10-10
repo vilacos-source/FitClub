@@ -1,5 +1,5 @@
 import { test, expect, ConsoleMessage, Page } from '@playwright/test';
-import { deleteTestAccount } from './helpers/cleanup';
+import { deleteTestAccount, newTestAccount } from './helpers/cleanup';
 
 /**
  * Batería de smoke tests de FitClub.
@@ -203,6 +203,41 @@ test.describe('FitClub smoke tests', () => {
       // Autolimpieza: sin esto, cada despliegue dejaría una cuenta de prueba
       // acumulada en el proyecto.
       await deleteTestAccount(email, password);
+    }
+  });
+
+  test('S8 - al entrar (o recargar) se ve la pantalla de Inicio, no un hueco vacío', async ({ page }) => {
+    // El bug: al recargar con la sesión abierta, la vista quedaba a medias y no
+    // se pintaba nada hasta tocar una pestaña. El test entra, recarga, y exige
+    // que el contenido aparezca SOLO, sin tocar ningún botón.
+    const account = newTestAccount('inicio');
+    const stamp = Date.now();
+
+    try {
+      await loadApp(page);
+      await page.getByRole('button', { name: /Empezar el Reto/i }).click();
+      await page.getByPlaceholder('Email').fill(account.email);
+      await page.getByPlaceholder('Contraseña').fill(account.password);
+      await page.getByPlaceholder(/nombre real/i).fill('Inicio Test');
+      await page.getByPlaceholder(/Pseudónimo/i).fill(`inicio${String(stamp).slice(-5)}`);
+      await page.getByPlaceholder(/Peso inicial/i).fill('77');
+      await page.getByRole('button', { name: /Unirme al grupo/i }).click();
+
+      await expect(page.getByRole('button', { name: /^Inicio$/i })).toBeVisible({ timeout: 20_000 });
+
+      // Recargamos: es justo lo que hace la usuaria al volver a abrir la app.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+
+      // Sin tocar nada: el panel tiene que estar ahí solo.
+      await expect(
+        page.getByText(/Ranking global|¡Bienvenido|Peso actual|Registrar peso/i).first(),
+        'Al recargar no se pintó la pantalla de Inicio: se quedó en blanco hasta tocar una pestaña',
+      ).toBeVisible({ timeout: 25_000 });
+
+      // Y la pestaña de Inicio debe estar marcada como activa.
+      await expect(page.getByRole('button', { name: /^Inicio$/i })).toBeVisible();
+    } finally {
+      await deleteTestAccount(account.email, account.password);
     }
   });
 
