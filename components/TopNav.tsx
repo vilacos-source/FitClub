@@ -14,9 +14,9 @@ const TopNav: React.FC<TopNavProps> = ({ currentUser, onLogout }) => {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex justify-between items-center">
+      <header className="sticky top-0 z-50 bar-blur backdrop-blur-md border-b px-4 py-3 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-200">
+          <div className="w-8 h-8 grad-brand rounded-lg flex items-center justify-center text-white font-bold shadow-lg">
             F
           </div>
           <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
@@ -48,7 +48,7 @@ const TopNav: React.FC<TopNavProps> = ({ currentUser, onLogout }) => {
             </button>
           </div>
         )}
-      </nav>
+      </header>
 
       {confirmarSalida && currentUser && (
         <div
@@ -59,7 +59,7 @@ const TopNav: React.FC<TopNavProps> = ({ currentUser, onLogout }) => {
             role="dialog"
             aria-modal="true"
             aria-labelledby="titulo-confirmar-salida"
-            className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-in fade-in zoom-in duration-200"
+            className="card-modal rounded-3xl p-6 w-full max-w-sm animate-in fade-in zoom-in duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="titulo-confirmar-salida" className="text-xl font-black text-slate-800 mb-2">
@@ -82,7 +82,7 @@ const TopNav: React.FC<TopNavProps> = ({ currentUser, onLogout }) => {
                   setConfirmarSalida(false);
                   onLogout();
                 }}
-                className="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-2xl shadow-lg active:scale-95 transition-all"
+                className="flex-1 btn-primary font-bold py-3 rounded-2xl active:scale-95 transition-all"
               >
                 Cerrar sesión
               </button>

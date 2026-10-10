@@ -354,7 +354,7 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
       </div>
     );
@@ -362,9 +362,9 @@ const App: React.FC = () => {
 
   if (!currentUser || !competitionConfig) {
     return (
-      <div className="min-h-screen bg-slate-50 max-w-md mx-auto shadow-2xl flex flex-col">
+      <div className="min-h-screen max-w-md mx-auto flex flex-col">
         <TopNav currentUser={null} onLogout={() => {}} />
-        <main className="flex-1 p-4 overflow-y-auto">
+        <main className="flex-1 p-4 pb-24 overflow-y-auto">
           <LandingPage onRegister={handleRegister} />
         </main>
       </div>
@@ -372,9 +372,9 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 max-w-md mx-auto shadow-2xl relative flex flex-col">
+    <div className="min-h-screen max-w-md mx-auto relative flex flex-col">
       <TopNav currentUser={currentUser} onLogout={handleLogout} />
-      <main className="flex-1 p-4 overflow-y-auto">
+      <main className="flex-1 p-4 pb-24 overflow-y-auto">
         {/* `'welcome'` NO es una vista navegable: es el estado del que viene un
             usuario sin sesión. Si llegamos aquí con él (por ejemplo, tras
             cerrar sesión desde dentro), pintamos el panel de Inicio en vez de
@@ -444,21 +444,21 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-xl border-t border-slate-100 h-16 flex items-center justify-around px-2 pb-2 z-50">
-        <button onClick={() => setActiveView('dashboard')} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeView === 'dashboard' ? 'text-indigo-600 scale-110' : 'text-slate-400'}`}>
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bar-blur backdrop-blur-xl border-t h-16 flex items-center justify-around px-2 pb-2 z-50">
+        <button onClick={() => setActiveView('dashboard')} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeView === 'dashboard' ? 'text-indigo-600 scale-110' : 'text-slate-500'}`}>
           <Home className="w-5 h-5" />
           <span className="text-[9px] font-bold uppercase tracking-wider">Inicio</span>
         </button>
-        <button onClick={() => setActiveView('leaderboard')} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeView === 'leaderboard' ? 'text-indigo-600 scale-110' : 'text-slate-400'}`}>
+        <button onClick={() => setActiveView('leaderboard')} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeView === 'leaderboard' ? 'text-indigo-600 scale-110' : 'text-slate-500'}`}>
           <Trophy className="w-5 h-5" />
           <span className="text-[9px] font-bold uppercase tracking-wider">Ranking</span>
         </button>
-        <button onClick={() => setActiveView('rules')} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeView === 'rules' ? 'text-indigo-600 scale-110' : 'text-slate-400'}`}>
+        <button onClick={() => setActiveView('rules')} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeView === 'rules' ? 'text-indigo-600 scale-110' : 'text-slate-500'}`}>
           <BookOpen className="w-5 h-5" />
           <span className="text-[9px] font-bold uppercase tracking-wider">Reglas</span>
         </button>
         {currentUser.isAdmin && (
-          <button onClick={() => setActiveView('admin')} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeView === 'admin' ? 'text-indigo-600 scale-110' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveView('admin')} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeView === 'admin' ? 'text-indigo-600 scale-110' : 'text-slate-500'}`}>
             <Settings className="w-5 h-5" />
             <span className="text-[9px] font-bold uppercase tracking-wider">Admin</span>
           </button>

@@ -90,7 +90,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users, currentUser, config })
               className={`flex items-center gap-4 p-4 rounded-3xl transition-all border ${
                 index === 0 
                   ? isFinished ? 'bg-amber-50 border-amber-200' : 'bg-indigo-50 border-indigo-100 scale-105 shadow-md z-10' 
-                  : 'bg-white border-slate-50 shadow-sm'
+                  : 'card'
               } ${user.id === currentUser?.id ? 'border-indigo-300 ring-1 ring-indigo-100' : ''}`}
             >
               <div className="relative">

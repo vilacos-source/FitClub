@@ -158,7 +158,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
       </div>
 
       {/* Gráfico de Evolución */}
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+      <div className="card rounded-3xl p-6">
         <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-indigo-500" />
           Tu Historial Visual
@@ -179,7 +179,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
       </div>
 
       {/* Formulario de Registro o Mensaje de Cierre */}
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+      <div className="card rounded-3xl p-6">
         <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
            <PenLine className="w-5 h-5 text-indigo-500" />
           {isFinished ? 'Reto Finalizado' : 'Registro Diario'}
@@ -204,7 +204,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
                 <input type="number" step="0.1" inputMode="decimal" value={newWeight} onChange={(e) => setNewWeight(e.target.value)} placeholder="Tu peso hoy..." className="w-full bg-slate-50 border-none rounded-2xl py-3.5 px-5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 transition-all outline-none" />
                 <span className="absolute right-4 top-3.5 text-slate-400 font-bold">kg</span>
               </div>
-              <button type="submit" className="bg-indigo-600 text-white font-bold py-3.5 px-6 rounded-2xl hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-100">Enviar</button>
+              <button type="submit" className="btn-primary text-white font-bold py-3.5 px-6 rounded-2xl hover:brightness-110 active:scale-95 transition-all">Enviar</button>
             </div>
             <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl cursor-pointer select-none active:bg-slate-100 transition-colors border border-transparent active:border-slate-200">
               <input type="checkbox" checked={ateOut} onChange={(e) => setAteOut(e.target.checked)} className="w-5 h-5 rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500" />
@@ -219,7 +219,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
       </div>
 
       {/* Histórico de Datos */}
-      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+      <div className="card rounded-3xl p-6">
         <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
           <History className="w-5 h-5 text-indigo-500" />
           Registros Pasados
@@ -247,7 +247,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
           ))}
           <div className="flex items-center justify-between p-4 bg-indigo-50/50 rounded-2xl border border-indigo-200/50 relative overflow-hidden">
             <div className="flex items-center gap-3 relative z-10">
-              <div className="bg-indigo-600 w-10 h-10 rounded-xl flex flex-col items-center justify-center shadow-sm text-white">
+              <div className="grad-brand w-10 h-10 rounded-xl flex flex-col items-center justify-center shadow-sm text-white">
                 <span className="text-[10px] font-black uppercase leading-none opacity-80">{formatDate(config.startDate).split(' ')[1]}</span>
                 <span className="text-sm font-bold leading-tight">{formatDate(config.startDate).split(' ')[0]}</span>
               </div>

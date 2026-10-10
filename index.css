@@ -4,8 +4,65 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
+/*
+ * Tratamiento visual elegido (opción «tarjetas que flotan»).
+ *
+ * El problema anterior: el fondo era casi blanco (#f8fafc) y las tarjetas
+ * blancas puras, así que no había contraste y nada destacaba. Ahora el fondo
+ * lleva un degradado suave y las tarjetas se despegan de verdad.
+ */
+:root {
+  --app-gradient: linear-gradient(168deg, #e7ebff 0%, #f2eaff 56%, #e4f1ff 100%);
+  --grad-primary: linear-gradient(135deg, #4f46e5, #7c3aed);
+  --card-border: rgba(124, 58, 237, 0.16);
+  --shadow-card: 0 14px 28px -16px rgba(76, 71, 140, 0.6);
+  --shadow-card-strong: 0 20px 40px -18px rgba(76, 71, 140, 0.72);
+}
+
 body {
-  background-color: #f8fafc;
+  background-color: #eef1fb; /* respaldo por si el degradado no se aplicara */
+  background-image: var(--app-gradient);
+  background-attachment: fixed;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  /* Tarjeta blanca que flota sobre el fondo. */
+  .card {
+    background: #fff;
+    border: 1px solid var(--card-border);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Para elementos que van por encima de todo (modales). */
+  .card-modal {
+    background: #fff;
+    border: 1px solid var(--card-border);
+    box-shadow: var(--shadow-card-strong);
+  }
+
+  /* Campos de formulario: lavanda muy tenue, sin borde duro. */
+  .field {
+    background: #f7f5ff;
+    border: 1px solid rgba(124, 58, 237, 0.12);
+  }
+
+  /* Botón principal. */
+  .btn-primary {
+    background-image: var(--grad-primary);
+    color: #fff;
+    box-shadow: 0 12px 24px -11px rgba(79, 70, 229, 0.9);
+  }
+
+  /* El degradado de marca, para logos y fichas de color. */
+  .grad-brand {
+    background-image: var(--grad-primary);
+  }
+
+  /* Barras superior e inferior: translúcidas sobre el degradado. */
+  .bar-blur {
+    background: rgba(255, 255, 255, 0.88);
+    border-color: var(--card-border);
+  }
 }

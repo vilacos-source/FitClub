@@ -213,6 +213,30 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   más** está publicando en el mismo sitio. La API de Pages puede seguir anunciando
   un origen (`main`/`docs`) que ya no es el que sirve: lo que manda es `build_type`.
 
+### INC-014 — El final del contenido quedaba tapado por la barra inferior ✅ resuelto
+- **Síntoma:** en el panel, el último bloque (la pregunta «¿Comiste fuera ayer?» y
+  sus casillas) quedaba parcialmente **por debajo de la barra de navegación**, que
+  va fija abajo.
+- **Causa:** `<main>` no reservaba espacio para la barra (`h-16`), así que al
+  llegar al final del scroll el contenido se metía debajo.
+- **Solución:** `pb-24` en el `<main>`. Comprobado midiendo: al final del scroll el
+  último contenido termina en 608 px y la barra empieza en 780 px, así que ya no
+  se solapan.
+- **Lección:** con una barra `fixed` hay que reservar su alto como relleno del
+  contenedor que hace scroll. Es fácil que pase desapercibido en pantallas cortas
+  porque solo afecta al último elemento.
+
+### Cambio de diseño (opción «tarjetas que flotan») ✅ aplicado
+- **Motivo:** la usuaria lo pidió — «demasiado blanco y las tarjetas destacan poco».
+  El fondo era `#f8fafc` y las tarjetas blancas puras: sin contraste.
+- **Qué cambió:** fondo con degradado suave; tarjetas blancas con borde y sombra
+  reales (`.card`); botones en degradado (`.btn-primary`); barras superior e
+  inferior translúcidas (`.bar-blur`); campos con lavanda tenue (`.field`); y los
+  iconos inactivos de la barra un escalón más oscuros, que antes casi no se veían.
+- **Cómo está montado:** los estilos viven en `index.css` como clases reutilizables,
+  no repartidos por los componentes. Cambiar el tratamiento entero es tocar ahí.
+- **Sin cambios de comportamiento:** solo aspecto. Nada de librerías nuevas.
+
 ---
 
 ## Batería de smoke tests

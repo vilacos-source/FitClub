@@ -60,7 +60,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
 
       {/* Configuración del Reto */}
       <form onSubmit={handleSubmitConfig} className="space-y-4">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+        <div className="card p-6 rounded-3xl space-y-4">
           <h3 className="text-sm font-bold text-slate-800 border-b pb-2 mb-2">Configuración General</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -99,7 +99,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
       </form>
 
       {/* Gestión de Participantes */}
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+      <div className="card p-6 rounded-3xl space-y-4">
         <div className="flex justify-between items-center border-b pb-2 mb-2">
           <h3 className="text-sm font-bold text-slate-800">Participantes</h3>
           <button 
@@ -139,7 +139,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
               />
               <span className="absolute right-3 top-2 text-slate-400 text-xs font-bold">kg</span>
             </div>
-            <button type="submit" className="w-full bg-indigo-600 text-white text-sm font-bold py-2 rounded-xl shadow-lg shadow-indigo-100">
+            <button type="submit" className="w-full btn-primary text-white text-sm font-bold py-2 rounded-xl">
               Registrar Participante
             </button>
           </form>
@@ -185,7 +185,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
       {/* Modal de Confirmación de Borrado */}
       {userToDelete && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-xs rounded-[2rem] p-6 shadow-2xl scale-in-center">
+          <div className="card-modal w-full max-w-xs rounded-[2rem] p-6 scale-in-center">
             <h3 className="text-center text-lg font-bold text-slate-800 mb-2">¿Dar de baja?</h3>
             <p className="text-center text-xs text-slate-500 mb-6">
               Vas a eliminar a <span className="font-bold text-slate-700">{userToDelete.pseudonym}</span>. Se perderá todo su historial de puntos.
