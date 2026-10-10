@@ -284,6 +284,19 @@ test.describe('FitClub smoke tests', () => {
     }
   });
 
+  test('S10 - la app publica su version y sabe cuando hay una nueva', async ({ request }) => {
+    // Sin esto no es que la app se rompa: es que un cambio de version se queda
+    // invisible y no se puede detectar. Es la pieza que evita la pantalla en
+    // blanco por caché (GitHub Pages borra los assets del despliegue anterior),
+    // así que conviene que falle fuerte si alguien la quita sin darse cuenta.
+    const respuesta = await request.get(`${APP_URL}version.json`, { headers: { 'Cache-Control': 'no-cache' } });
+    expect(respuesta.status(), 'Falta version.json: el aviso de version nueva no puede funcionar').toBe(200);
+
+    const datos = await respuesta.json();
+    expect(typeof datos.buildId, 'version.json no trae un buildId de texto').toBe('string');
+    expect(datos.buildId.length, 'version.json trae un buildId vacío').toBeGreaterThan(0);
+  });
+
   test('S4 - login con credenciales inexistentes da error controlado (no cuelga)', async ({ page }) => {
     const dialogs: string[] = [];
     page.on('dialog', async (d) => {
