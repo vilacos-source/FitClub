@@ -101,6 +101,27 @@ test.describe('FitClub smoke tests', () => {
     await expect(page.getByRole('button', { name: /Unirme al grupo/i })).toBeVisible();
   });
 
+  test('S2b - el ojo de la contraseña alterna entre verla y ocultarla', async ({ page }) => {
+    await loadApp(page);
+    await page.getByRole('button', { name: /Empezar el Reto/i }).click();
+
+    const password = page.getByPlaceholder('Contraseña');
+    await password.fill('MiClave123');
+
+    // Por defecto, oculta.
+    await expect(password).toHaveAttribute('type', 'password');
+
+    // El ojo la enseña…
+    await page.getByRole('button', { name: /Mostrar contraseña/i }).click();
+    await expect(password).toHaveAttribute('type', 'text');
+    // …y no se pierde lo escrito al alternar.
+    await expect(password).toHaveValue('MiClave123');
+
+    // Y la vuelve a ocultar.
+    await page.getByRole('button', { name: /Ocultar contraseña/i }).click();
+    await expect(password).toHaveAttribute('type', 'password');
+  });
+
   test('S3 - el registro de un usuario nuevo funciona de verdad', async ({ page }) => {
     const errors = await collectErrors(page);
     const dialogs: string[] = [];

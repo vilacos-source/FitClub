@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
 import { auth } from '../services/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 
@@ -11,6 +11,7 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onRegister }) => {
   const [mode, setMode] = useState<'landing' | 'signup' | 'login'>('landing');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -74,11 +75,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onRegister }) => {
           value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})}
           className="w-full bg-white border-none rounded-2xl py-4 px-5 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
         />
-        <input 
-          type="password" required placeholder="Contraseña"
-          value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})}
-          className="w-full bg-white border-none rounded-2xl py-4 px-5 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-        />
+        <div className="relative">
+          <input 
+            type={showPassword ? "text" : "password"} required placeholder="Contraseña"
+            value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})}
+            className="w-full bg-white border-none rounded-2xl py-4 px-5 pr-14 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          {/* type="button": si no, este botón enviaría el formulario al pulsarlo */}
+          <button
+            type="button"
+            onClick={() => setShowPassword(v => !v)}
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            className="absolute inset-y-0 right-4 flex items-center text-slate-400 hover:text-indigo-600 active:scale-90 transition-all"
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        </div>
 
         {mode === 'signup' && (
           <>
