@@ -174,6 +174,31 @@ test.describe('FitClub smoke tests', () => {
           `Errores consola: ${errors.slice(-3).join(' | ') || '(ninguno)'}\n` +
           `Diagnóstico: ${diagnose(dialogText || errors.slice(-3).join(' '))}`,
       ).toBe(true);
+
+      // El icono del perfil NO puede cerrar la sesión de un solo toque: antes lo
+      // hacía, y era un pie de banco (basta rozarlo para quedarte fuera).
+      await page.getByRole('button', { name: /Tu perfil/i }).click();
+      await expect(
+        page.getByRole('dialog'),
+        'Tocar el icono del perfil debe abrir una confirmación, no cerrar la sesión',
+      ).toBeVisible();
+      await expect(page.getByText(/¿Cerrar sesión\?/i)).toBeVisible();
+
+      // Cancelar: seguimos dentro y con la sesión abierta.
+      await page.getByRole('button', { name: /^Cancelar$/i }).click();
+      await expect(page.getByRole('dialog')).toBeHidden();
+      await expect(
+        page.getByRole('button', { name: /Tu perfil/i }),
+        'Cancelar debe dejarte dentro de la app',
+      ).toBeVisible();
+
+      // Confirmar: ahora sí se cierra, y volvemos a la pantalla de inicio.
+      await page.getByRole('button', { name: /Tu perfil/i }).click();
+      await page.getByRole('button', { name: /^Cerrar sesión$/i }).click();
+      await expect(
+        page.getByRole('button', { name: /Empezar el Reto/i }),
+        'Tras confirmar deberíamos volver a la pantalla de inicio',
+      ).toBeVisible({ timeout: 15_000 });
     } finally {
       // Autolimpieza: sin esto, cada despliegue dejaría una cuenta de prueba
       // acumulada en el proyecto.

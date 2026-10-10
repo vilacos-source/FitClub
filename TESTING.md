@@ -107,6 +107,21 @@ mejorar conjuntamente.
 - **Lección:** nunca crear clientes de servicios externos en el nivel del módulo
   de algo que importa la app; hacerlo dentro de la función y envuelto en try/catch.
 
+### INC-009 — Tocar el icono del perfil cerraba la sesión sin avisar ✅ resuelto
+- **Síntoma:** un toque en el avatar de la barra superior te sacaba de la app al
+  instante. Sin confirmación y sin querer: basta rozarlo.
+- **Reproducido:** sí, leyendo el componente: `components/TopNav.tsx` llamaba a
+  `onLogout` directamente en el `onClick` del avatar.
+- **Causa raíz:** el botón no distinguía «abrir mi perfil» de «cerrar sesión», y
+  cerrar sesión es destructivo (hay que volver a entrar con email y contraseña).
+- **Solución:** confirmación propia de la app (no un `confirm()` del navegador):
+  `role="dialog"`, con «Cancelar» y «Cerrar sesión». Tocar fuera también cancela.
+  De paso, el botón tenía **nombre accesible vacío** (la imagen con `alt=""`), así
+  que no era ni localizable por un test ni anunciado por un lector de pantalla;
+  ahora lleva `aria-label="Tu perfil"`.
+- **Cubierto por:** smoke test **S3** (abre la confirmación, «Cancelar» te deja
+  dentro, y solo al confirmar se cierra la sesión).
+
 ---
 
 ## Batería de smoke tests
