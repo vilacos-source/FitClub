@@ -182,6 +182,37 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   nuevo** (el hash del `assets/index-*.js` cambia). Un `vite preview` no recarga
   el bundle solo.
 
+### INC-012 — Pantalla en blanco por caché tras cada despliegue ✅ resuelto
+- **Síntoma:** justo después de publicar una versión nueva, la app aparecía en
+  blanco. Le pasó a la usuaria tras pedir un cambio de color, y lo interpretó
+  como *"le pedí un cambio y ahora no arranca"*.
+- **Causa raíz:** no era el cambio. GitHub Pages **borra los assets del despliegue
+  anterior** y sirve el `index.html` con `cache-control: max-age=600`. El
+  navegador con la versión vieja en caché sigue pidiendo `assets/index-<viejo>.js`,
+  que ya devuelve **404**, así que no carga nada. Comprobado: los assets del
+  despliegue anterior daban 404 y los nuevos 200.
+- **Solución (automática):** cada compilación escribe `version.json` con un id
+  propio, que también queda incrustado en el bundle. La app lo consulta al
+  arrancar, cada 5 minutos y al volver a la pestaña; si el id no es el suyo, se
+  recarga con `?v=<nuevo id>`, que rompe la caché. No recarga mientras el usuario
+  está escribiendo, para no perder un pesaje a medias. Ver `services/versionCheck.ts`.
+- **Cubierto por:** smoke test **S10** (`version.json` existe y trae un `buildId`).
+
+### INC-013 — Dos despliegues compitiendo (Pages en modo "rama") ✅ resuelto
+- **Hallazgo:** la configuración de Pages seguía en `build_type: legacy` con origen
+  `main` / carpeta `/docs`, mientras el workflow publica **por artefacto**. En cada
+  push GitHub lanzaba además su `pages build and deployment` del `docs/` obsoleto:
+  dos despliegues por el mismo destino. Si el viejo terminaba después, la web
+  **retrocedía** a una versión de hacía semanas.
+- **Efecto colateral:** la carpeta `docs/` (1,4 MB de build compilado) estaba
+  commiteada en el repo, que no es sitio para un artefacto de compilación.
+- **Solución:** `build_type: workflow` (solo el workflow publica), y `docs/`
+  eliminada del repositorio. Comprobado: tras el cambio solo corre **un** workflow
+  por push.
+- **Lección:** no basta con que el workflow publique bien; hay que comprobar **quién
+  más** está publicando en el mismo sitio. La API de Pages puede seguir anunciando
+  un origen (`main`/`docs`) que ya no es el que sirve: lo que manda es `build_type`.
+
 ---
 
 ## Batería de smoke tests
