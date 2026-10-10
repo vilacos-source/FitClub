@@ -228,14 +228,57 @@ test.describe('FitClub smoke tests', () => {
       // Recargamos: es justo lo que hace la usuaria al volver a abrir la app.
       await page.reload({ waitUntil: 'domcontentloaded' });
 
-      // Sin tocar nada: el panel tiene que estar ahí solo.
+      // Sin tocar nada: el panel tiene que estar ahí solo. Los textos son los
+      // que realmente pinta el panel (comprobados en Dashboard.tsx): buscar uno
+      // inventado hace fallar el test con la app funcionando perfectamente.
       await expect(
-        page.getByText(/Ranking global|¡Bienvenido|Peso actual|Registrar peso/i).first(),
+        page.getByText(/Coach IA|Logros Finales|Tu Historial Visual/i).first(),
         'Al recargar no se pintó la pantalla de Inicio: se quedó en blanco hasta tocar una pestaña',
       ).toBeVisible({ timeout: 25_000 });
 
       // Y la pestaña de Inicio debe estar marcada como activa.
       await expect(page.getByRole('button', { name: /^Inicio$/i })).toBeVisible();
+    } finally {
+      await deleteTestAccount(account.email, account.password);
+    }
+  });
+
+  test('S9 - al entrar con una cuenta existente se ve el panel sin tocar nada', async ({ page }) => {
+    // El bug de verdad: iniciar sesión con un usuario que YA existe dejaba la
+    // app en blanco. `onAuthStateChanged` dispara un aviso con el usuario
+    // momentáneamente a null; ese aviso reseteaba la vista a 'welcome', que no
+    // pintaba nada, y ahí se quedaba. Solo se arreglaba pulsando una pestaña.
+    const account = newTestAccount('entrar');
+    const stamp = Date.now();
+
+    try {
+      // Registro (esto sí funcionaba) y después salgo, para entrar de nuevo.
+      await loadApp(page);
+      await page.getByRole('button', { name: /Empezar el Reto/i }).click();
+      await page.getByPlaceholder('Email').fill(account.email);
+      await page.getByPlaceholder('Contraseña').fill(account.password);
+      await page.getByPlaceholder(/nombre real/i).fill('Entrar Test');
+      await page.getByPlaceholder(/Pseudónimo/i).fill(`entrar${String(stamp).slice(-5)}`);
+      await page.getByPlaceholder(/Peso inicial/i).fill('80');
+      await page.getByRole('button', { name: /Unirme al grupo/i }).click();
+      await expect(page.getByRole('button', { name: /^Inicio$/i })).toBeVisible({ timeout: 20_000 });
+
+      // Cierro sesión usando la confirmación de la app.
+      await page.getByRole('button', { name: 'Tu perfil' }).click();
+      await page.getByRole('button', { name: /^Cerrar sesión$/ }).click();
+      await expect(page.getByRole('button', { name: /Empezar el Reto/i })).toBeVisible({ timeout: 15_000 });
+
+      // Y aquí está el caso que fallaba: entrar con una cuenta que ya existe.
+      await page.getByRole('button', { name: /Ya tengo cuenta/i }).click();
+      await page.getByPlaceholder('Email').fill(account.email);
+      await page.getByPlaceholder('Contraseña').fill(account.password);
+      await page.getByRole('button', { name: /^Entrar$/ }).click();
+
+      // Sin tocar ninguna pestaña: el panel tiene que aparecer solo.
+      await expect(
+        page.getByText(/Coach IA|Logros Finales|Tu Historial Visual/i).first(),
+        'Al entrar con una cuenta existente no se pintó nada: la app se quedó en blanco',
+      ).toBeVisible({ timeout: 25_000 });
     } finally {
       await deleteTestAccount(account.email, account.password);
     }

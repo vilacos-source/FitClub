@@ -143,6 +143,45 @@ mejorar conjuntamente.
   pantalla en blanco si ninguna rama la pinta. Nunca uses como estado inicial un
   valor que el render no cubre — y si el valor existe, cubrirlo o eliminarlo.
 
+### INC-011 — Al ENTRAR con una cuenta existente, la app se quedaba en blanco ✅ resuelto
+- **Síntoma:** iniciar sesión con un usuario que ya existe dejaba el cuerpo de la
+  app vacío. Se veían la barra inferior y el saludo con el pseudónimo, pero el
+  panel no. Hasta pulsar Inicio o Ranking no aparecía nada.
+- **No es lo mismo que INC-010** (ese era al recargar la página). Este se dispara
+  **al entrar**, y el arreglo de INC-010 no lo cubría.
+- **Reproducido:** sí. Cerrar sesión → «Ya tengo cuenta» → entrar, y medir sin
+  tocar nada: `main.innerText.length === 0` durante más de 24 s, y la vista
+  interna atascada en `'welcome'`.
+- **Causa raíz:** `onAuthStateChanged` avisa **dos veces** al iniciar sesión: la
+  segunda con el usuario momentáneamente a `null`. La rama del `else` reseteaba
+  `setCurrentUser(null)` y **`setActiveView('welcome')`** sin comprobar si de
+  verdad había sesión. Justo después llegaba el usuario bueno y sus datos, así que
+  la barra y el saludo sí aparecían — pero la vista ya se había quedado en
+  `'welcome'`, y **ninguna rama del render pintaba esa vista**.
+- **Solución, en dos partes:**
+  1. La rama sin sesión solo resetea si de verdad no hay sesión
+     (`else if (!auth.currentUser)`, leyendo el valor en vivo, no el del aviso).
+  2. `'welcome'` **pinta el panel de Inicio**. Así, aunque algo vuelva a dejar la
+     vista ahí, la pantalla nunca se queda vacía: es imposible que un valor del
+     tipo `View` no tenga render.
+- **Cubierto por:** smoke test **S9** (registro → cerrar sesión → entrar, y exigir
+  el panel sin tocar nada). Verificado que **falla** con el código antiguo.
+- **Lección:** un cambio de estado dentro de un callback asíncrono de autenticación
+  debe comprobar la **fuente de verdad** (`auth.currentUser`), no el argumento del
+  callback: los proveedores avisan de más y con valores transitorios.
+
+### Y una lección sobre MIS PROPIOS tests
+Al añadir S8 escribí el assert contra textos inventados (`Peso actual`,
+`Ranking global`, `Registrar peso`). El test fallaba **con la app funcionando
+perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
+- **Los textos de un assert se copian del componente, nunca se imaginan.**
+- **Los tests leen `BASE_URL`**, no `APP_URL` (`APP_URL` solo lo declara el spec
+  por dentro). Pasar `APP_URL=...` hace que la batería corra **contra la web
+  pública** sin avisar: comparas tu build local con el despliegue viejo.
+- Antes de dar por bueno un resultado, **comprueba que el servidor sirve el build
+  nuevo** (el hash del `assets/index-*.js` cambia). Un `vite preview` no recarga
+  el bundle solo.
+
 ---
 
 ## Batería de smoke tests

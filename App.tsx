@@ -101,7 +101,11 @@ const App: React.FC = () => {
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
         }
-      } else {
+      } else if (!auth.currentUser) {
+        // Solo reseteamos si de verdad no hay sesión. `onAuthStateChanged`
+        // dispara un aviso con el usuario momentáneamente a `null` al iniciar
+        // sesión; si hiciéramos caso a ese aviso, pisaríamos la vista de un
+        // usuario que sí está dentro y la app se quedaba en blanco.
         setCurrentUser(null);
         setActiveView('welcome');
         try { sessionStorage.removeItem(SESSION_VIEW_KEY); } catch { /* da igual */ }
@@ -371,7 +375,12 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 max-w-md mx-auto shadow-2xl relative flex flex-col">
       <TopNav currentUser={currentUser} onLogout={handleLogout} />
       <main className="flex-1 p-4 overflow-y-auto">
-        {activeView === 'dashboard' && (
+        {/* `'welcome'` NO es una vista navegable: es el estado del que viene un
+            usuario sin sesión. Si llegamos aquí con él (por ejemplo, tras
+            cerrar sesión desde dentro), pintamos el panel de Inicio en vez de
+            dejar el hueco vacío. Antes no lo cubría ninguna rama y la app se
+            quedaba en blanco hasta tocar una pestaña. */}
+        {(activeView === 'dashboard' || activeView === 'welcome') && (
           <Dashboard user={currentUser} leaderboard={users} onAddWeight={handleAddWeight} config={competitionConfig} />
         )}
         {activeView === 'leaderboard' && (
