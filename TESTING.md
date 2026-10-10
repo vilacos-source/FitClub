@@ -235,6 +235,12 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   iconos inactivos de la barra un escalón más oscuros, que antes casi no se veían.
 - **Cómo está montado:** los estilos viven en `index.css` como clases reutilizables,
   no repartidos por los componentes. Cambiar el tratamiento entero es tocar ahí.
+- **Gráfico del historial en barras:** a petición suya (como la propuesta que eligió),
+  el historial pasó de gráfico de área (línea) a **barras verticales**, una por
+  pesaje, con la más reciente destacada en violeta y el resto en lavanda. Cubierto
+  por **S12**, que comprueba que hay una barra por pesaje y ninguna área; el test
+  **falla** con el gráfico de línea antiguo (comprobado), así que un refactor no
+  puede devolverlo a línea en silencio.
 - **Sin cambios de comportamiento:** solo aspecto. Nada de librerías nuevas.
 
 ---

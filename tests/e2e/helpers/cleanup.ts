@@ -1,6 +1,6 @@
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, deleteUser, signOut } from 'firebase/auth';
-import { getFirestore, doc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -82,4 +82,53 @@ export function newTestAccount(prefix: string): TestAccount {
     email: `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}@example.com`,
     password: 'Prueba12345!',
   };
+}
+
+/** Un pesaje para sembrar. */
+export interface SeedWeighIn {
+  date: string; // YYYY-MM-DD
+  weight: number;
+  delta: number;
+  points: number;
+}
+
+/**
+ * Escribe un historial de pesajes en el documento privado de una cuenta.
+ *
+ * Los tests crean la cuenta por el camino real (el formulario), pero hay cosas
+ * que en la vida real tardarían días en acumularse — un historial de cinco
+ * pesajes, por ejemplo — y no se puede esperar. Esto rellena el dato para poder
+ * comprobar cómo se dibuja. `merge` conserva el nombre real que escribió el alta.
+ */
+export async function seedHistory(
+  email: string,
+  password: string,
+  entries: SeedWeighIn[],
+): Promise<boolean> {
+  const app = initializeApp(
+    cfg,
+    `seed-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  const auth = getAuth(app);
+  const db = getFirestore(app, cfg.firestoreDatabaseId);
+
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const history = entries.map((e, i) => ({ id: `seed-${i}`, ateOut: false, ...e }));
+    await setDoc(doc(db, PRIVATE_COLLECTION, cred.user.uid), { history }, { merge: true });
+    return true;
+  } catch (error) {
+    console.warn(
+      `[siembra] No se pudo escribir el historial de ${email}:`,
+      (error as Error)?.message ?? error,
+    );
+    return false;
+  } finally {
+    try {
+      await signOut(auth);
+    } catch {
+      /* da igual: cerramos la app igualmente */
+    }
+    await deleteApp(app);
+  }
 }

@@ -1,5 +1,5 @@
 import { test, expect, ConsoleMessage, Page } from '@playwright/test';
-import { deleteTestAccount, newTestAccount } from './helpers/cleanup';
+import { deleteTestAccount, newTestAccount, seedHistory } from './helpers/cleanup';
 
 /**
  * Batería de smoke tests de FitClub.
@@ -326,6 +326,63 @@ test.describe('FitClub smoke tests', () => {
 
     // Dejamos de simular para que la app no entre en bucle de recargas.
     await page.unroute('**/version.json*');
+  });
+
+  test('S12 - el historial se dibuja con barras, no con una línea', async ({ page }) => {
+    // La usuaria pidió expresamente barras (como la propuesta que eligió). Sin
+    // este test, un refactor puede devolverlo a línea sin que nadie se entere:
+    // el gráfico seguiría "funcionando" y solo se notaría mirándolo.
+    const email = `barras+${Date.now()}@example.com`;
+    const password = 'Prueba12345!';
+
+    try {
+      // 1. Alta por el camino real, como haría una persona.
+      await loadApp(page);
+      await page.getByRole('button', { name: /Empezar el Reto/i }).click();
+      await page.getByPlaceholder('Email').fill(email);
+      await page.getByPlaceholder('Contraseña').fill(password);
+      await page.getByPlaceholder(/nombre real/i).fill('Barras Test');
+      await page.getByPlaceholder(/Pseudónimo/i).fill(`barras${String(Date.now()).slice(-6)}`);
+      await page.getByPlaceholder(/Peso inicial/i).fill('85');
+      await page.getByRole('button', { name: /Unirme al grupo/i }).click();
+      await expect(page.getByText(/Coach IA/i)).toBeVisible({ timeout: 25_000 });
+
+      // 2. Un historial de cinco pesajes: en la vida real tardaría cinco días.
+      const hoy = new Date();
+      const dia = (atras: number) => {
+        const d = new Date(hoy);
+        d.setDate(d.getDate() - atras);
+        const off = d.getTimezoneOffset();
+        return new Date(d.getTime() - off * 60000).toISOString().split('T')[0];
+      };
+      const pesos = [84.2, 83.6, 83.1, 82.9, 82.1];
+      const sembrado = await seedHistory(
+        email,
+        password,
+        pesos.map((w, i) => ({
+          date: dia(pesos.length - 1 - i),
+          weight: w,
+          delta: i === 0 ? -(85 - w) : -(pesos[i - 1] - w),
+          points: 10 + i * 5,
+        })),
+      );
+      expect(sembrado, 'No se pudo preparar el historial de prueba').toBe(true);
+
+      // 3. Recargamos para que la app lea los pesajes nuevos.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.getByText(/Tu Historial Visual/i)).toBeVisible({ timeout: 25_000 });
+
+      // 4. Una barra por pesaje...
+      await expect(
+        page.locator('.recharts-bar-rectangle'),
+        'Debería haber una barra por cada pesaje',
+      ).toHaveCount(pesos.length, { timeout: 20_000 });
+
+      // 5. ...y ninguna área/línea, que es lo que había antes.
+      await expect(page.locator('.recharts-area')).toHaveCount(0);
+    } finally {
+      await deleteTestAccount(email, password);
+    }
   });
 
   test('S4 - login con credenciales inexistentes da error controlado (no cuelga)', async ({ page }) => {

@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, TrendingUp, PenLine, History } from 'lucide-react';
 import { User, PublicProfile, CompetitionConfig } from '../types';
-import { ResponsiveContainer, Tooltip, AreaChart, Area } from 'recharts';
+import { ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, Cell } from 'recharts';
 import { getMotivationalMessage, getWelcomeMessage } from '../services/geminiService';
 
 interface DashboardProps {
@@ -165,15 +165,29 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
         </h3>
         <div className="h-48 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="colorLoss" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/><stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '12px' }} itemStyle={{ fontWeight: 'bold', color: '#6366f1' }} />
-              <Area type="monotone" dataKey="pérdida" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorLoss)" />
-            </AreaChart>
+            <BarChart data={chartData} barCategoryGap="28%">
+              <XAxis
+                dataKey="name"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: '#9aa3b2' }}
+              />
+              <Tooltip
+                contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                itemStyle={{ fontWeight: 'bold', color: '#7c3aed' }}
+                cursor={{ fill: 'rgba(124,58,237,0.07)' }}
+              />
+              {/* Una barra por pesaje: la altura es la pérdida acumulada. La más
+                  reciente va destacada en violeta, el resto en lavanda claro. */}
+              <Bar dataKey="pérdida" radius={[7, 7, 0, 0]}>
+                {chartData.map((_, i) => (
+                  <Cell
+                    key={i}
+                    fill={i === chartData.length - 1 ? '#7c3aed' : '#ddd6fe'}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
