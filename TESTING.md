@@ -243,6 +243,26 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   puede devolverlo a línea en silencio.
 - **Sin cambios de comportamiento:** solo aspecto. Nada de librerías nuevas.
 
+### Ajustes del panel (segunda ronda) ✅ aplicados
+- **La tarjeta de registro, antes del historial.** Se registra el peso a diario;
+  el gráfico es para consultar, así que el registro va primero.
+- **El gráfico abarca TODO el reto**, no solo los días con pesaje: se dibuja un
+  hueco por día del periodo y la barra va en su día real. Antes el eje era
+  `S0, S1, S2…` (la posición del pesaje, no la fecha), lo que no decía nada.
+- **Fecha dd/mm bajo cada barra.** Con un pesaje diario no caben todas las fechas
+  en ~300 px, así que se rotula con un mínimo de 4 días entre etiquetas y siempre
+  la del pesaje más reciente. Si en algún momento se quieren todas, habría que
+  rotularlas en diagonal o dejar desplazar el gráfico en horizontal.
+- **Paginación si el reto pasa de un mes** (`DIAS_POR_PAGINA = 31`): flechas de
+  periodo anterior/siguiente y rango visible. El reto actual (10/10→09/11, 31
+  días) cabe en un solo periodo, así que enseña solo el rango. Con un periodo
+  único no se muestran flechas que no llevarían a ningún sitio.
+- **Mensaje motivacional** un punto más pequeño (`text-xl` → `text-lg`, 20→18 px).
+- **Ojo al comprobar el eje en los tests:** recharts pinta el texto de las marcas
+  **fuera** del grupo `.recharts-xAxis`. Buscarlo ahí devuelve vacío aunque las
+  fechas se vean en pantalla; hay que buscarlo en `.recharts-surface text`. Me
+  pasó y me llevó a "arreglar" algo que ya funcionaba.
+
 ---
 
 ## Batería de smoke tests

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { RefreshCw, TrendingUp, PenLine, History } from 'lucide-react';
+import { RefreshCw, TrendingUp, PenLine, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import { User, PublicProfile, CompetitionConfig } from '../types';
 import { ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, Cell } from 'recharts';
 import { getMotivationalMessage, getWelcomeMessage } from '../services/geminiService';
@@ -93,15 +93,80 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
     }
   };
 
-  const chartData = user.history.map((h, index) => {
-    let accumulated = 0;
-    for(let i=0; i<=index; i++) accumulated += user.history[i].delta;
-    return {
-      name: `S${index}`,
-      pérdida: Math.abs(accumulated).toFixed(1),
-      puntos: h.points
-    };
+  // ---------------------------------------------------------------------------
+  // Datos del gráfico del historial.
+  //
+  // El eje abarca el reto COMPLETO (un hueco por día), no solo los días en que
+  // hubo pesaje: así el avance se ve en su contexto real. Los días sin pesaje
+  // quedan sin barra. Si el reto dura más de un mes, se pagina por bloques.
+  // ---------------------------------------------------------------------------
+  const DIAS_POR_PAGINA = 31;
+
+  /** Fecha local en YYYY-MM-DD, el mismo formato que guarda la app. */
+  const diaLocal = (d: Date) => {
+    const off = d.getTimezoneOffset();
+    return new Date(d.getTime() - off * 60000).toISOString().split('T')[0];
+  };
+
+  /** De YYYY-MM-DD a DD/MM, que es como lo lee una persona. */
+  const ddmm = (fecha: string) => {
+    const partes = (fecha || '').split('-');
+    return partes.length === 3 ? `${partes[2]}/${partes[1]}` : fecha;
+  };
+
+  /** Todos los días del reto, del primero al último. */
+  const diasDelReto = (() => {
+    const inicio = new Date(`${config.startDate}T00:00:00`);
+    const fin = new Date(`${config.endDate}T00:00:00`);
+    if (isNaN(inicio.getTime()) || isNaN(fin.getTime()) || fin < inicio) return [] as string[];
+    const dias: string[] = [];
+    for (const d = new Date(inicio); d <= fin && dias.length < 1000; d.setDate(d.getDate() + 1)) {
+      dias.push(diaLocal(d));
+    }
+    return dias;
+  })();
+
+  const [pagina, setPagina] = useState(0);
+  const paginasTotales = Math.max(1, Math.ceil(diasDelReto.length / DIAS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, paginasTotales - 1);
+
+  // Los días que se ven ahora. Si la configuración no trae fechas válidas, se
+  // cae a los días con pesaje para que el gráfico nunca quede vacío.
+  const diasPagina =
+    diasDelReto.length > 0
+      ? diasDelReto.slice(paginaActual * DIAS_POR_PAGINA, (paginaActual + 1) * DIAS_POR_PAGINA)
+      : user.history.map((h) => h.date);
+
+  const chartData = diasPagina.map((dia) => {
+    const idx = user.history.findIndex((h) => h.date === dia);
+    if (idx === -1) return { name: ddmm(dia), pérdida: 0, pesaje: false, dia };
+    let acumulada = 0;
+    for (let i = 0; i <= idx; i++) acumulada += user.history[i].delta;
+    return { name: ddmm(dia), pérdida: Number(Math.abs(acumulada).toFixed(1)), pesaje: true, dia };
   });
+
+  // El pesaje más reciente de todo el reto: va destacado en violeta.
+  const diaMasReciente = user.history.reduce((max, h) => (h.date > max ? h.date : max), '');
+
+  // Las fechas que se rotulan bajo las barras. En un móvil caben ~300 px, así
+  // que un pesaje diario no puede llevar todas: se exige un mínimo de 4 días
+  // entre etiquetas, y la del pesaje más reciente sale siempre para orientarte.
+  // Se pasan al eje como lista explícita (con `tickFormatter` el eje no recibía
+  // el valor que esperábamos y no rotulaba ninguna).
+  const fechasEtiquetadas: string[] = [];
+  {
+    let ultimaEtiqueta = -99;
+    chartData.forEach((d, i) => {
+      if (d.pesaje && i - ultimaEtiqueta >= 4) {
+        fechasEtiquetadas.push(d.name);
+        ultimaEtiqueta = i;
+      }
+    });
+    const masReciente = chartData.find((d) => d.dia === diaMasReciente);
+    if (masReciente && !fechasEtiquetadas.includes(masReciente.name)) {
+      fechasEtiquetadas.push(masReciente.name);
+    }
+  }
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -138,7 +203,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
                 <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce [animation-delay:0.4s]"></div>
               </div>
             ) : (
-              <h2 className="text-xl font-bold italic leading-tight">
+              <h2 className="text-lg font-bold italic leading-tight">
                 {isFinished ? `¡Reto completado, ${user.pseudonym}! Has logrado una transformación increíble de ${user.totalWeightLoss.toFixed(1)}kg.` : aiMessage}
               </h2>
             )}
@@ -154,41 +219,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
               <p className="text-xl font-bold">{user.totalWeightLoss.toFixed(1)} kg</p>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Gráfico de Evolución */}
-      <div className="card rounded-3xl p-6">
-        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-indigo-500" />
-          Tu Historial Visual
-        </h3>
-        <div className="h-48 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} barCategoryGap="28%">
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fill: '#9aa3b2' }}
-              />
-              <Tooltip
-                contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                itemStyle={{ fontWeight: 'bold', color: '#7c3aed' }}
-                cursor={{ fill: 'rgba(124,58,237,0.07)' }}
-              />
-              {/* Una barra por pesaje: la altura es la pérdida acumulada. La más
-                  reciente va destacada en violeta, el resto en lavanda claro. */}
-              <Bar dataKey="pérdida" radius={[7, 7, 0, 0]}>
-                {chartData.map((_, i) => (
-                  <Cell
-                    key={i}
-                    fill={i === chartData.length - 1 ? '#7c3aed' : '#ddd6fe'}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
         </div>
       </div>
 
@@ -230,6 +260,76 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
             </label>
           </form>
         )}
+      </div>
+
+      {/* Gráfico de Evolución: todo el reto, con paginación si pasa de un mes */}
+      <div className="card rounded-3xl p-6">
+        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-indigo-500" />
+          Tu Historial Visual
+        </h3>
+        <div className="h-48 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} barCategoryGap="14%">
+              <XAxis
+                dataKey="name"
+                ticks={fechasEtiquetadas}
+                interval={0}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 9, fill: '#9aa3b2' }}
+              />
+              <Tooltip
+                contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                itemStyle={{ fontWeight: 'bold', color: '#7c3aed' }}
+                cursor={{ fill: 'rgba(124,58,237,0.07)' }}
+              />
+              {/* Una barra por día CON pesaje (los demás días no tienen barra),
+                  situadas a lo largo de todo el reto. La altura es la pérdida
+                  acumulada; la más reciente va en violeta, el resto en lavanda. */}
+              <Bar dataKey="pérdida" radius={[5, 5, 0, 0]}>
+                {chartData.map((d, i) => (
+                  <Cell key={i} fill={d.dia === diaMasReciente ? '#7c3aed' : '#ddd6fe'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {diasPagina.length > 0 &&
+          (paginasTotales > 1 ? (
+            <div className="flex items-center justify-between mt-3">
+              <button
+                type="button"
+                onClick={() => setPagina((p) => Math.max(0, p - 1))}
+                disabled={paginaActual === 0}
+                aria-label="Periodo anterior"
+                className="p-2 rounded-xl bg-slate-50 text-slate-600 disabled:opacity-30 active:scale-95 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <span className="text-[11px] font-bold text-slate-500">
+                {ddmm(diasPagina[0])} – {ddmm(diasPagina[diasPagina.length - 1])} ·{' '}
+                {paginaActual + 1} de {paginasTotales}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setPagina((p) => Math.min(paginasTotales - 1, p + 1))}
+                disabled={paginaActual >= paginasTotales - 1}
+                aria-label="Periodo siguiente"
+                className="p-2 rounded-xl bg-slate-50 text-slate-600 disabled:opacity-30 active:scale-95 transition-all"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            // Un solo periodo: solo el rango, sin flechas que no llevan a ningún sitio.
+            <p className="text-[11px] font-bold text-slate-400 text-center mt-3">
+              {ddmm(diasPagina[0])} – {ddmm(diasPagina[diasPagina.length - 1])}
+            </p>
+          ))}
       </div>
 
       {/* Histórico de Datos */}

@@ -1,5 +1,5 @@
 import { test, expect, ConsoleMessage, Page } from '@playwright/test';
-import { deleteTestAccount, newTestAccount, seedHistory } from './helpers/cleanup';
+import { deleteTestAccount, newTestAccount, seedHistoryInChallenge } from './helpers/cleanup';
 
 /**
  * Batería de smoke tests de FitClub.
@@ -347,26 +347,11 @@ test.describe('FitClub smoke tests', () => {
       await page.getByRole('button', { name: /Unirme al grupo/i }).click();
       await expect(page.getByText(/Coach IA/i)).toBeVisible({ timeout: 25_000 });
 
-      // 2. Un historial de cinco pesajes: en la vida real tardaría cinco días.
-      const hoy = new Date();
-      const dia = (atras: number) => {
-        const d = new Date(hoy);
-        d.setDate(d.getDate() - atras);
-        const off = d.getTimezoneOffset();
-        return new Date(d.getTime() - off * 60000).toISOString().split('T')[0];
-      };
-      const pesos = [84.2, 83.6, 83.1, 82.9, 82.1];
-      const sembrado = await seedHistory(
-        email,
-        password,
-        pesos.map((w, i) => ({
-          date: dia(pesos.length - 1 - i),
-          weight: w,
-          delta: i === 0 ? -(85 - w) : -(pesos[i - 1] - w),
-          points: 10 + i * 5,
-        })),
-      );
-      expect(sembrado, 'No se pudo preparar el historial de prueba').toBe(true);
+      // 2. Sembramos pesajes DENTRO del periodo del reto: en la vida real
+      //    tardarían cinco días en acumularse.
+      const cuantos = 5;
+      const sembrados = await seedHistoryInChallenge(email, password, cuantos);
+      expect(sembrados, 'No se pudo preparar el historial de prueba').toBe(cuantos);
 
       // 3. Recargamos para que la app lea los pesajes nuevos.
       await page.reload({ waitUntil: 'domcontentloaded' });
@@ -376,10 +361,28 @@ test.describe('FitClub smoke tests', () => {
       await expect(
         page.locator('.recharts-bar-rectangle'),
         'Debería haber una barra por cada pesaje',
-      ).toHaveCount(pesos.length, { timeout: 20_000 });
+      ).toHaveCount(cuantos, { timeout: 20_000 });
 
       // 5. ...y ninguna área/línea, que es lo que había antes.
       await expect(page.locator('.recharts-area')).toHaveCount(0);
+
+      // 6. Bajo las barras va la fecha dd/mm, no el "S0" de antes.
+      //    OJO: recharts pinta el texto de las marcas fuera del grupo del eje,
+      //    así que hay que buscarlo en toda la superficie del gráfico. Buscarlo
+      //    en `.recharts-xAxis text` no encuentra nada aunque las fechas estén.
+      const etiquetas = await page.evaluate(() =>
+        [...document.querySelectorAll('.recharts-surface text')]
+          .map((t) => (t.textContent || '').trim())
+          .filter(Boolean),
+      );
+      expect(
+        etiquetas.some((e) => /^\d{2}\/\d{2}$/.test(e)),
+        `Debería haber fechas dd/mm bajo las barras; encontré: ${JSON.stringify(etiquetas)}`,
+      ).toBe(true);
+      expect(
+        etiquetas.some((e) => /^S\d+$/.test(e)),
+        'Ya no debería aparecer el "S0, S1..." de antes',
+      ).toBe(false);
     } finally {
       await deleteTestAccount(email, password);
     }

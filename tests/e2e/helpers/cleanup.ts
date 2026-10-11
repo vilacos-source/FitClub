@@ -1,6 +1,6 @@
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, deleteUser, signOut } from 'firebase/auth';
-import { getFirestore, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -84,27 +84,22 @@ export function newTestAccount(prefix: string): TestAccount {
   };
 }
 
-/** Un pesaje para sembrar. */
-export interface SeedWeighIn {
-  date: string; // YYYY-MM-DD
-  weight: number;
-  delta: number;
-  points: number;
-}
-
 /**
- * Escribe un historial de pesajes en el documento privado de una cuenta.
+ * Rellena un historial de pesajes DENTRO del periodo del reto en curso.
  *
- * Los tests crean la cuenta por el camino real (el formulario), pero hay cosas
- * que en la vida real tardarían días en acumularse — un historial de cinco
- * pesajes, por ejemplo — y no se puede esperar. Esto rellena el dato para poder
- * comprobar cómo se dibuja. `merge` conserva el nombre real que escribió el alta.
+ * Los tests crean la cuenta por el camino real (el formulario), pero un
+ * historial de cinco pesajes tardaría cinco días en acumularse. Y hay que
+ * sembrarlo dentro del periodo: el gráfico dibuja el reto completo (un hueco por
+ * día), así que un pesaje de fuera del periodo no aparecería y el test estaría
+ * midiendo otra cosa. Por eso primero se lee `settings/competition`.
+ *
+ * Devuelve cuántos pesajes escribió, o 0 si no pudo.
  */
-export async function seedHistory(
+export async function seedHistoryInChallenge(
   email: string,
   password: string,
-  entries: SeedWeighIn[],
-): Promise<boolean> {
+  cuantos: number,
+): Promise<number> {
   const app = initializeApp(
     cfg,
     `seed-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -112,17 +107,42 @@ export async function seedHistory(
   const auth = getAuth(app);
   const db = getFirestore(app, cfg.firestoreDatabaseId);
 
+  /** Suma días a una fecha YYYY-MM-DD sin líos de zona horaria. */
+  const sumarDias = (fecha: string, n: number) => {
+    const [y, m, d] = fecha.split('-').map(Number);
+    const base = new Date(y, m - 1, d + n);
+    return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
+  };
+
   try {
     const cred = await signInWithEmailAndPassword(auth, email, password);
-    const history = entries.map((e, i) => ({ id: `seed-${i}`, ateOut: false, ...e }));
+
+    const snap = await getDoc(doc(db, 'settings', 'competition'));
+    const conf = snap.exists() ? (snap.data() as { startDate?: string }) : null;
+    const inicio = conf?.startDate;
+    if (!inicio) {
+      console.warn('[siembra] No se pudo leer el inicio del reto; no se siembra.');
+      return 0;
+    }
+
+    const pesos = [84.2, 83.6, 83.1, 82.9, 82.1];
+    const history = pesos.slice(0, cuantos).map((w, i) => ({
+      id: `seed-${i}`,
+      date: sumarDias(inicio, i), // los primeros días del reto, seguro dentro
+      weight: w,
+      delta: i === 0 ? -(85 - w) : -(pesos[i - 1] - w),
+      points: 10 + i * 5,
+      ateOut: false,
+    }));
+
     await setDoc(doc(db, PRIVATE_COLLECTION, cred.user.uid), { history }, { merge: true });
-    return true;
+    return history.length;
   } catch (error) {
     console.warn(
       `[siembra] No se pudo escribir el historial de ${email}:`,
       (error as Error)?.message ?? error,
     );
-    return false;
+    return 0;
   } finally {
     try {
       await signOut(auth);
