@@ -145,19 +145,22 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users, currentUser, config })
         </div>
       )}
 
-      <div className="mt-8 bg-slate-900 rounded-3xl p-6 text-white overflow-hidden relative shadow-lg">
+      <div className="mt-8 bg-gradient-to-br from-blue-500 via-blue-600 to-sky-400 rounded-3xl p-6 text-white overflow-hidden relative shadow-lg shadow-blue-200">
         <div className="relative z-10">
           <h3 className="text-lg font-bold mb-3">{isFinished ? 'Premio Entregado' : 'Premio Final'}</h3>
-          <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
-            <div className="w-10 h-10 bg-amber-400/20 rounded-xl flex items-center justify-center text-xl shadow-inner">
+          <div className="flex items-center gap-3 bg-white/15 p-4 rounded-2xl border border-white/25 backdrop-blur-sm">
+            <div className="w-10 h-10 bg-white/25 rounded-xl flex items-center justify-center text-xl shadow-inner">
               🎁
             </div>
-            <p className="text-sm text-slate-200 font-medium leading-tight">
+            <p className="text-sm text-white font-medium leading-tight">
               {config.prizeDescription}
             </p>
           </div>
-          <p className="text-[10px] text-slate-400 mt-4 uppercase tracking-[0.2em] font-bold">
-            Periodo: {new Date(config.startDate).toLocaleDateString()} - {new Date(config.endDate).toLocaleDateString()}
+          <p className="text-[10px] text-white/80 mt-4 uppercase tracking-[0.2em] font-bold">
+            {/* Con `toLocaleDateString()` a secas, el formato depende del idioma
+                del dispositivo: en un móvil en inglés salía MM/DD y parecía que
+                el reto acababa antes de empezar. Fijado en español. */}
+            Periodo: {new Date(config.startDate).toLocaleDateString('es-ES')} - {new Date(config.endDate).toLocaleDateString('es-ES')}
           </p>
         </div>
       </div>

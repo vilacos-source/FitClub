@@ -41,9 +41,12 @@ const getAi = (): GoogleGenAI | null => {
   return ai;
 };
 
+// Mensajes de reserva: se usan cuando Gemini no está disponible o se ha agotado
+// su cuota. Tampoco mencionan puntos ni cifras, por el mismo motivo que el
+// prompt: el mensaje se guarda un día entero y cualquier número quedaría viejo.
 const DEFAULT_MOTIVATIONAL = [
   "¡A tope {name}! ¡Dale caña que tú puedes! 💪",
-  "¿Cómo va eso, {name}? ¡A seguir sumando puntos! 🔥",
+  "¿Cómo va eso, {name}? ¡A seguir dándole! 🔥",
   "¡Vaya crack estás hecho, {name}! Ni un paso atrás. 🚀",
   "¡Ojo, que {name} viene pisando fuerte hoy! 👟",
   "Ni el azúcar ni la pereza pueden contigo, {name}. ¡Vamos! 🍎",
@@ -71,7 +74,6 @@ export const getMotivationalMessage = async (user: User, leaderboard: PublicProf
     Usuario: ${user.realName} (Pseudónimo: ${user.pseudonym})
     Puesto actual: ${position} de ${leaderboard.length}
     Último registro: ${lastChange === 0 ? 'empezando' : lastChange < 0 ? 'ha bajado peso' : 'ha subido un poco'}
-    Puntos totales: ${user.totalPoints}
     
     Genera un mensaje MUY INFORMAL y divertido (máximo 2 frases cortas) en español de España.
     REGLAS DE ESTILO:
@@ -83,6 +85,9 @@ export const getMotivationalMessage = async (user: User, leaderboard: PublicProf
     - Si va último, dale ánimos con humor.
     - Usa emojis divertidos.
     - NUNCA menciones kilos exactos ni seas formal.
+    - NUNCA menciones puntos ni ninguna otra cifra: el mensaje se guarda en el
+      móvil de cada uno durante un día entero, así que cualquier número que
+      escribas se queda desfasado y acaba diciendo algo falso.
   `;
 
   const client = getAi();

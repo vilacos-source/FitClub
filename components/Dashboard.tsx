@@ -148,25 +148,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
   // El pesaje más reciente de todo el reto: va destacado en violeta.
   const diaMasReciente = user.history.reduce((max, h) => (h.date > max ? h.date : max), '');
 
-  // Las fechas que se rotulan bajo las barras. En un móvil caben ~300 px, así
-  // que un pesaje diario no puede llevar todas: se exige un mínimo de 4 días
-  // entre etiquetas, y la del pesaje más reciente sale siempre para orientarte.
-  // Se pasan al eje como lista explícita (con `tickFormatter` el eje no recibía
-  // el valor que esperábamos y no rotulaba ninguna).
-  const fechasEtiquetadas: string[] = [];
-  {
-    let ultimaEtiqueta = -99;
-    chartData.forEach((d, i) => {
-      if (d.pesaje && i - ultimaEtiqueta >= 4) {
-        fechasEtiquetadas.push(d.name);
-        ultimaEtiqueta = i;
-      }
-    });
-    const masReciente = chartData.find((d) => d.dia === diaMasReciente);
-    if (masReciente && !fechasEtiquetadas.includes(masReciente.name)) {
-      fechasEtiquetadas.push(masReciente.name);
-    }
-  }
+  // Las fechas NO se rotulan bajo las barras: en un móvil se amontonaban y no
+  // quedaban bien. El dato se ve al pasar por encima (el tooltip), y para eso el
+  // eje tiene que seguir existiendo aunque no pinte marcas.
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -223,40 +207,44 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
       </div>
 
       {/* Formulario de Registro o Mensaje de Cierre */}
-      <div className="card rounded-3xl p-6">
-        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+      <div className="card rounded-3xl p-5">
+        <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
            <PenLine className="w-5 h-5 text-indigo-500" />
           {isFinished ? 'Reto Finalizado' : 'Registro Diario'}
         </h3>
-        
+
         {isFinished ? (
-          <div className="bg-slate-50 border border-slate-100 rounded-3xl p-6 text-center">
-            <div className="text-4xl mb-3">🏁</div>
-            <p className="text-slate-800 font-bold text-lg mb-1">¡Periodo cerrado!</p>
-            <p className="text-slate-500 text-sm">El tiempo de este reto ha terminado. Consulta el ranking para ver quién ha ganado el premio.</p>
+          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
+            <div className="text-3xl mb-2">🏁</div>
+            <p className="text-slate-800 font-bold text-base mb-1">¡Periodo cerrado!</p>
+            <p className="text-slate-500 text-xs">El tiempo de este reto ha terminado. Consulta el ranking para ver quién ha ganado el premio.</p>
           </div>
         ) : hasRegisteredToday ? (
-          <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 text-center animate-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-white text-2xl mx-auto mb-4 shadow-lg shadow-emerald-100">✓</div>
-            <p className="text-emerald-800 font-bold text-lg mb-1">¡Peso guardado!</p>
-            <p className="text-emerald-600 text-sm">Ya has cumplido con tu registro hoy. ¡Vuelve mañana!</p>
+          // Compacta: en fila, no un bloque grande centrado. Esta tarjeta ocupa
+          // casi siempre el mismo sitio y no debe comerse la pantalla.
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center gap-3 animate-in zoom-in-95 duration-300">
+            <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white text-lg shrink-0 shadow-lg shadow-emerald-100">✓</div>
+            <div>
+              <p className="text-emerald-800 font-bold text-sm">¡Peso guardado!</p>
+              <p className="text-emerald-600 text-xs">Ya has cumplido hoy. ¡Vuelve mañana!</p>
+            </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-2.5">
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <input type="number" step="0.1" inputMode="decimal" value={newWeight} onChange={(e) => setNewWeight(e.target.value)} placeholder="Tu peso hoy..." className="w-full bg-slate-50 border-none rounded-2xl py-3.5 px-5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 transition-all outline-none" />
-                <span className="absolute right-4 top-3.5 text-slate-400 font-bold">kg</span>
+                <input type="number" step="0.1" inputMode="decimal" value={newWeight} onChange={(e) => setNewWeight(e.target.value)} placeholder="Tu peso hoy..." className="w-full bg-slate-50 border-none rounded-2xl py-3 px-5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 transition-all outline-none" />
+                <span className="absolute right-4 top-3 text-slate-400 font-bold">kg</span>
               </div>
-              <button type="submit" className="btn-primary text-white font-bold py-3.5 px-6 rounded-2xl hover:brightness-110 active:scale-95 transition-all">Enviar</button>
+              <button type="submit" className="btn-primary text-white font-bold py-3 px-6 rounded-2xl hover:brightness-110 active:scale-95 transition-all">Enviar</button>
             </div>
-            <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl cursor-pointer select-none active:bg-slate-100 transition-colors border border-transparent active:border-slate-200">
+            <label className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-2xl cursor-pointer select-none active:bg-slate-100 transition-colors border border-transparent active:border-slate-200">
               <input type="checkbox" checked={ateOut} onChange={(e) => setAteOut(e.target.checked)} className="w-5 h-5 rounded-lg border-slate-300 text-indigo-600 focus:ring-indigo-500" />
               <div className="flex-1">
                 <p className="text-sm font-bold text-slate-700">¿Comiste fuera ayer?</p>
                 <p className="text-[10px] text-indigo-500 uppercase font-bold tracking-tight">¡Bono Social de +50 pts!</p>
               </div>
-              <span className="text-2xl">🍽️</span>
+              <span className="text-xl">🍽️</span>
             </label>
           </form>
         )}
@@ -271,14 +259,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
         <div className="h-48 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} barCategoryGap="14%">
-              <XAxis
-                dataKey="name"
-                ticks={fechasEtiquetadas}
-                interval={0}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 9, fill: '#9aa3b2' }}
-              />
+              {/* Sin marcas: el eje se queda para que el tooltip siga sabiendo la
+                  fecha, pero no pinta nada. `height` pequeño para no dejar hueco. */}
+              <XAxis dataKey="name" tick={false} axisLine={false} tickLine={false} height={10} />
               <Tooltip
                 contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '12px' }}
                 itemStyle={{ fontWeight: 'bold', color: '#7c3aed' }}

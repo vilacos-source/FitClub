@@ -366,23 +366,26 @@ test.describe('FitClub smoke tests', () => {
       // 5. ...y ninguna área/línea, que es lo que había antes.
       await expect(page.locator('.recharts-area')).toHaveCount(0);
 
-      // 6. Bajo las barras va la fecha dd/mm, no el "S0" de antes.
+      // 6. Ya NO hay fechas debajo de las barras: se amontonaban en el móvil y
+      //    no quedaban bien. El dato se ve al pasar por encima.
       //    OJO: recharts pinta el texto de las marcas fuera del grupo del eje,
-      //    así que hay que buscarlo en toda la superficie del gráfico. Buscarlo
-      //    en `.recharts-xAxis text` no encuentra nada aunque las fechas estén.
+      //    así que hay que buscarlo en toda la superficie del gráfico.
       const etiquetas = await page.evaluate(() =>
         [...document.querySelectorAll('.recharts-surface text')]
           .map((t) => (t.textContent || '').trim())
           .filter(Boolean),
       );
       expect(
-        etiquetas.some((e) => /^\d{2}\/\d{2}$/.test(e)),
-        `Debería haber fechas dd/mm bajo las barras; encontré: ${JSON.stringify(etiquetas)}`,
-      ).toBe(true);
-      expect(
-        etiquetas.some((e) => /^S\d+$/.test(e)),
-        'Ya no debería aparecer el "S0, S1..." de antes',
-      ).toBe(false);
+        etiquetas.filter((e) => /^\d{2}\/\d{2}$/.test(e)),
+        `No debería haber fechas bajo las barras; encontré: ${JSON.stringify(etiquetas)}`,
+      ).toHaveLength(0);
+
+      // 7. Al pasar por encima de una barra sale su dato.
+      await page.locator('.recharts-bar-rectangle').last().hover();
+      await expect(
+        page.locator('.recharts-tooltip-wrapper').filter({ hasText: /\d/ }),
+        'Al pasar por encima de una barra debería verse su dato',
+      ).toBeVisible({ timeout: 10_000 });
     } finally {
       await deleteTestAccount(email, password);
     }

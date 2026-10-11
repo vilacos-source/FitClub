@@ -263,6 +263,27 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   fechas se vean en pantalla; hay que buscarlo en `.recharts-surface text`. Me
   pasó y me llevó a "arreglar" algo que ya funcionaba.
 
+### Ajustes del panel (tercera ronda) ✅ aplicados
+- **Tarjeta de registro más baja.** Medido con la misma cuenta y el mismo estado:
+  **231 → 197 px** con el formulario, y **296 → 148 px** en el estado "peso
+  guardado" (ese dejó de ser un bloque grande centrado y pasó a una fila
+  compacta). Menos relleno, y el icono del check más pequeño.
+- **Fuera las fechas bajo las barras.** Se amontonaban y no quedaban bien; el
+  dato se ve al pasar por encima. El eje se mantiene con `tick={false}` porque el
+  tooltip necesita la categoría para poder mostrar la fecha.
+- **Los mensajes motivacionales ya no mencionan puntos.** Se pasaban a Gemini en
+  el prompt (`Puntos totales: ...`) y el mensaje se guarda en el móvil **un día
+  entero**, así que cualquier cifra acababa desfasada. Ahora no se le pasan y se
+  le prohíbe explícitamente mencionar puntos o cualquier número. El mensaje de
+  reserva que decía "¡A seguir sumando puntos!" está reescrito.
+  **Regla general:** un texto que se cachea no puede contener datos que cambian.
+- **Tarjeta del premio en azul brillante** (antes negra, no encajaba). Degradado
+  azul y los elementos interiores aclarados para que se lean sobre el color.
+- **Fechas del premio en formato español fijo.** Con `toLocaleDateString()` a
+  secas el formato dependía del idioma del dispositivo, y en un móvil en inglés
+  el periodo salía como `10/10/2026 - 11/9/2026`, que parece que el reto acaba
+  antes de empezar. Fijado a `'es-ES'`.
+
 ---
 
 ## Batería de smoke tests
