@@ -36,6 +36,34 @@ import { Home, Trophy, BookOpen, Settings } from 'lucide-react';
  */
 const ADMIN_EMAILS = ['vilacos@gmail.com'];
 
+/**
+ * Clave de documento para un participante apuntado a mano desde el panel.
+ *
+ * NO se puede usar un identificador inventado: los datos viven en documentos
+ * con el uid de la cuenta de acceso (`users/{uid}`), y al registrarse la app
+ * escribe ahí. Si inventáramos la clave, al entrar esa persona se crearía un
+ * perfil DUPLICADO (el apuntado vacío + el suyo de verdad).
+ *
+ * Tampoco se puede consultar su uid real: Firebase Auth no deja preguntar si un
+ * email tiene cuenta, a propósito, para que nadie pueda averiguar quién está
+ * registrado en un sitio. La salida es una clave DERIVADA del email: cuando esa
+ * persona se registre, la app escribirá en la misma clave y completará el perfil
+ * apuntado en vez de duplicarlo.
+ *
+ * El hash NO es por seguridad (el email no es un secreto): es para respetar el
+ * límite de 128 caracteres del identificador de documento y no meter el email en
+ * crudo dentro de una clave.
+ */
+const claveDeEmail = async (email: string): Promise<string> => {
+  const normalizado = email.trim().toLowerCase();
+  const bytes = new TextEncoder().encode(normalizado);
+  const resumen = await crypto.subtle.digest('SHA-256', bytes);
+  const hex = Array.from(new Uint8Array(resumen))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `email_${hex.slice(0, 40)}`;
+};
+
 type View = 'dashboard' | 'leaderboard' | 'rules' | 'admin' | 'welcome';
 
 // En qué pestaña estaba la app. Vive en `sessionStorage` a propósito:
@@ -295,6 +323,7 @@ const App: React.FC = () => {
     if (!auth.currentUser) return;
 
     const uid = auth.currentUser.uid;
+    const email = auth.currentUser.email ?? '';
     const fruit = FRUITS[Math.floor(Math.random() * FRUITS.length)];
 
     const publicProfile: Omit<PublicProfile, 'id'> = {
@@ -323,6 +352,24 @@ const App: React.FC = () => {
       // La app quedó abierta en ESTA pestaña durante la sesión, así que al
       // volver entra directamente en el panel en vez de en una pantalla vacía.
       try { sessionStorage.setItem(SESSION_VIEW_KEY, 'dashboard'); } catch { /* da igual */ }
+
+      // Si el admin ya había apuntado a esta persona a mano (con su email), su
+      // ficha está en una clave derivada del email y quedaría huérfana: el
+      // ranking mostraría dos perfiles. Se borra la apuntada, que estaba vacía
+      // (sin historial), para que quede solo el perfil real.
+      if (email) {
+        try {
+          const claveApuntada = await claveDeEmail(email);
+          const apuntada = await getDoc(privateDataRef(claveApuntada));
+          if (apuntada.exists()) {
+            await deleteDoc(publicProfileRef(claveApuntada));
+            await deleteDoc(privateDataRef(claveApuntada));
+          }
+        } catch {
+          // Que no se pueda limpiar no puede impedir que alguien se registre.
+          // Si queda, se ve un perfil repetido y el admin lo borra a mano.
+        }
+      }
     } catch (e) {
       handleFirestoreError(e, OperationType.CREATE, `users/${uid}`);
     }
@@ -405,11 +452,17 @@ const App: React.FC = () => {
               }
             }} 
             onAddUser={async (data) => {
-              // Crea un participante "de relleno", sin cuenta de acceso: podrá
-              // verlo el admin pero esa persona no podrá entrar hasta que se
-              // registre ella misma desde la pantalla de inicio.
+              // Apunta un participante ANTES de que se registre, para que su
+              // nombre salga en el ranking desde el primer día.
+              //
+              // La clave del documento se deriva de su email, no es un
+              // identificador inventado: al registrarse, la app escribe en
+              // users/{uid} y... ojo, eso NO coincide con esta clave. Por eso
+              // al registrarse se borra esta ficha (ver handleRegister). Lo que
+              // sí garantiza la clave derivada es que apuntarlo dos veces no
+              // cree dos fichas.
               const fruit = FRUITS[Math.floor(Math.random() * FRUITS.length)];
-              const id = Math.random().toString(36).substr(2, 9);
+              const id = await claveDeEmail(data.email);
               const publicProfile: Omit<PublicProfile, 'id'> = {
                 pseudonym: data.pseudonym,
                 avatar: `https://img.icons8.com/fluency/200/${fruit}.png`,

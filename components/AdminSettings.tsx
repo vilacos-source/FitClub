@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Trash2, ShieldCheck, ShieldAlert, Plus } from 'lucide-react';
+import { Trash2, ShieldCheck, ShieldAlert, Plus, Share2, Copy, Check, AlertTriangle } from 'lucide-react';
 import { CompetitionConfig, RankedUser } from '../types';
 
 interface AdminSettingsProps {
@@ -8,7 +8,7 @@ interface AdminSettingsProps {
   onUpdateConfig: (newConfig: CompetitionConfig) => void;
   users: RankedUser[];
   onRemoveUser: (userId: string) => void;
-  onAddUser: (userData: { realName: string, pseudonym: string, initialWeight: number }) => void;
+  onAddUser: (userData: { realName: string, email: string, pseudonym: string, initialWeight: number }) => void;
   onToggleAdmin: (userId: string) => void;
 }
 
@@ -16,12 +16,42 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
   const [formData, setFormData] = useState<CompetitionConfig>(config);
   const [userToDelete, setUserToDelete] = useState<RankedUser | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  
+  const [copiado, setCopiado] = useState(false);
+
   const [newUser, setNewUser] = useState({
     realName: '',
+    email: '',
     pseudonym: '',
     initialWeight: ''
   });
+
+  // Enlace de la app. Se calcula en vivo para que funcione tanto en la web
+  // publicada como en una prueba local, sin que haya que tocar nada.
+  const enlaceApp = `${window.location.origin}${window.location.pathname}`;
+  const nombreReto = `Reto FitClub · ${new Date(config.startDate).toLocaleDateString('es-ES')} – ${new Date(config.endDate).toLocaleDateString('es-ES')}`;
+  const textoWhatsApp =
+    `¡Te invito al ${nombreReto}! 🏆\n` +
+    `Entra aquí, coge tu pseudónimo y a por el premio: ${config.prizeDescription}\n` +
+    `El reto acaba el ${new Date(config.endDate).toLocaleDateString('es-ES')}.\n\n` +
+    `${enlaceApp}`;
+
+  const copiarTexto = async (texto: string) => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // Si el navegador no deja usar el portapapeles, se lo pedimos a mano:
+      // es más honesto que fallar en silencio.
+      window.prompt('Copia tú el texto:', texto);
+    }
+  };
+
+  const compartirWhatsApp = () => {
+    // wa.me abre WhatsApp con el mensaje ya escrito. En el móvil, si WhatsApp
+    // está instalado, funciona directo.
+    window.open(`https://wa.me/?text=${encodeURIComponent(textoWhatsApp)}`, '_blank');
+  };
 
   const handleSubmitConfig = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,15 +62,17 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
   const handleAddUserSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const weight = parseFloat(newUser.initialWeight.replace(',', '.'));
-    if (newUser.realName && newUser.pseudonym && !isNaN(weight)) {
+    const email = newUser.email.trim().toLowerCase();
+    if (newUser.realName && newUser.pseudonym && email && !isNaN(weight)) {
       onAddUser({
         realName: newUser.realName,
+        email,
         pseudonym: newUser.pseudonym,
         initialWeight: weight
       });
-      setNewUser({ realName: '', pseudonym: '', initialWeight: '' });
+      setNewUser({ realName: '', email: '', pseudonym: '', initialWeight: '' });
       setShowAddForm(false);
-      alert('Participante añadido con éxito');
+      alert('Participante apuntado. Mándale el enlace para que se registre con ese mismo email.');
     }
   };
 
@@ -56,6 +88,34 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
       <div>
         <h2 className="text-2xl font-bold text-slate-800">Panel de Control</h2>
         <p className="text-sm text-slate-500">Gestión del periodo y participantes</p>
+      </div>
+
+      {/* Compartir el enlace */}
+      <div className="card p-5 rounded-3xl space-y-3">
+        <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
+          <Share2 className="w-4 h-4 text-indigo-500" />
+          Invitar al reto
+        </h3>
+        <p className="text-xs text-slate-500">Manda el enlace por WhatsApp. Cada uno se registra desde su móvil cuando quiera.</p>
+        <div className="bg-slate-50 rounded-xl px-3 py-2 text-[11px] text-slate-600 font-mono break-all border border-slate-100">
+          {enlaceApp}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={compartirWhatsApp}
+            className="flex-1 bg-[#25D366] text-white text-sm font-bold py-2.5 rounded-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <Share2 className="w-4 h-4" /> Enviar por WhatsApp
+          </button>
+          <button
+            type="button"
+            onClick={() => copiarTexto(textoWhatsApp)}
+            className="px-4 bg-slate-100 text-slate-700 text-sm font-bold rounded-xl active:scale-95 transition-all flex items-center gap-2"
+          >
+            {copiado ? <><Check className="w-4 h-4 text-emerald-600" /> Copiado</> : <><Copy className="w-4 h-4" /> Copiar</>}
+          </button>
+        </div>
       </div>
 
       {/* Configuración del Reto */}
@@ -112,6 +172,27 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
 
         {showAddForm && (
           <form onSubmit={handleAddUserSubmit} className="bg-indigo-50/50 p-4 rounded-2xl space-y-3 animate-in slide-in-from-top-2 duration-200">
+            {/* Se CALCULA la clave de la persona a partir de su email. Tiene que
+                ser así: los datos van en documentos con el uid de su cuenta de
+                acceso, y al registrarse la app usa users/{uid}. Si aquí se
+                inventara un identificador, al entrar se crearía un perfil
+                DUPLICADO en vez de completar el que apuntas. */}
+            <input 
+              type="email"
+              placeholder="Email con el que entrará (ej: carlos@gmail.com)"
+              value={newUser.email}
+              onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+              className="w-full bg-white border-none rounded-xl py-2 px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[10px] text-amber-800 flex gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                Apunta a quien sea, pero <b>para poder entrar tiene que registrarse con ese
+                mismo email</b> desde el enlace de arriba. Si no coincide, tendrá dos perfiles:
+                el de aquí (vacío) y el suyo de verdad.
+              </span>
+            </div>
             <input 
               placeholder="Nombre Real (ej: Carlos)"
               value={newUser.realName}
