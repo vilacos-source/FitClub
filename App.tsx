@@ -10,8 +10,8 @@ import AdminSettings from './components/AdminSettings';
 import LandingPage from './components/LandingPage';
 
 // Firebase imports
-import { db, auth, handleFirestoreError, OperationType, publicProfileRef, privateDataRef, PUBLIC_COLLECTION } from './services/firebase';
-import { 
+import { db, auth, handleFirestoreError, OperationType, publicProfileRef, privateDataRef, PUBLIC_COLLECTION, PRIVATE_COLLECTION } from './services/firebase';
+import {
   collection, 
   onSnapshot, 
   doc, 
@@ -20,11 +20,21 @@ import {
   deleteDoc,
   getDoc,
   getDocFromServer,
+  getDocs,
   query,
   orderBy 
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Home, Trophy, BookOpen, Settings } from 'lucide-react';
+import {
+  construirCopia,
+  nombreDelFichero,
+  descargarTexto,
+  contarPesajes,
+  type DatosDelReto,
+  type DocumentoCopiado,
+  type ResumenCopia,
+} from './services/backup';
 
 /**
  * Emails con permisos de administrador.
@@ -375,6 +385,55 @@ const App: React.FC = () => {
     }
   };
 
+  /**
+   * Empieza la copia de seguridad: lee TODO y lo descarga como fichero.
+   *
+   * Necesita sesión de administrador: la colección privada (`users`, con los
+   * historiales) solo la puede leer el dueño de cada documento o un admin. Por
+   * eso el botón vive en el panel, que solo ve la administradora.
+   *
+   * Se leen las tres cosas a la vez (`Promise.all`): si una falla, no se genera
+   * un fichero a medias. Una copia incompleta es peor que no tener copia, porque
+   * parece que estás cubierto y no lo estás.
+   */
+  const exportarDatos = async (): Promise<ResumenCopia> => {
+    const [rankingSnap, personasSnap, configSnap] = await Promise.all([
+      getDocs(collection(db, PUBLIC_COLLECTION)),
+      getDocs(collection(db, PRIVATE_COLLECTION)),
+      getDoc(doc(db, 'settings', 'competition')),
+    ]);
+
+    // El identificador del documento es imprescindible para poder reconstruir
+    // después: sin él, un historial no se sabe de quién es.
+    const aDocumento = (d: { id: string; data: () => Record<string, unknown> }): DocumentoCopiado => ({
+      id: d.id,
+      ...d.data(),
+    });
+
+    const personas = personasSnap.docs.map(aDocumento);
+    const ahora = new Date();
+
+    const datos: DatosDelReto = {
+      ranking: rankingSnap.docs.map(aDocumento),
+      personas,
+      configuracion: configSnap.exists()
+        ? { id: configSnap.id, ...(configSnap.data() as Record<string, unknown>) }
+        : null,
+      emailAdmin: auth.currentUser?.email ?? '(sin email)',
+    };
+
+    const contenido = construirCopia(datos, ahora);
+    const fichero = nombreDelFichero(ahora);
+    descargarTexto(contenido, fichero);
+
+    return {
+      participantes: datos.ranking.length,
+      pesajes: contarPesajes(personas),
+      fichero,
+      tamanoKB: Math.round(new TextEncoder().encode(contenido).length / 1024),
+    };
+  };
+
   const handleUpdateConfig = async (newConfig: CompetitionConfig) => {
     try {
       await setDoc(doc(db, "settings", "competition"), newConfig);
@@ -440,6 +499,7 @@ const App: React.FC = () => {
           <AdminSettings 
             config={competitionConfig} onUpdateConfig={handleUpdateConfig} 
             users={rankedUsers} 
+            onExportar={exportarDatos}
             onRemoveUser={async (id) => {
               if (confirm("¿Estás seguro de que quieres eliminar a este usuario?")) {
                 try {

@@ -315,6 +315,35 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### Copia de seguridad de los datos ✅ aplicado
+- **El hueco más grave que había:** los pesajes de todo el grupo vivían **solo** en
+  Firestore y **no existía ninguna copia**. Si se perdían, no había vuelta atrás.
+  Ahora el panel tiene un botón que descarga **todo** en un fichero.
+- **La lógica está separada de la red a propósito** (`services/backup.ts` sin
+  tocar Firestore). Así la parte que puede perder datos se prueba de verdad con
+  tests; leer los datos necesita sesión de admin y no se puede probar sin ella.
+- **La regla que no se puede romper: todo lo que entra, sale.** Una copia que se
+  deja datos fuera es **peor** que no tener copia, porque da una falsa sensación
+  de estar cubierto. Hay un test por cada forma de perderlos: documentos
+  cambiados (B1), resumen que no cuadra (B2), pérdida parcial en un caso grande
+  (B3), sin datos (B4), persona sin historial (B5), y campos nuevos que no se
+  copian por descuido (B7).
+- **Los documentos se copian ENTEROS, sin filtrar campos.** Copiar campo por campo
+  es exactamente cómo se pierden datos en silencio cuando alguien añade algo
+  nuevo. Lo mismo con la configuración del reto y el identificador de cada
+  documento (sin él, un historial no se sabe de quién es).
+- **Se leen las tres fuentes a la vez** (`Promise.all`): si una falla, **no** se
+  genera un fichero a medias.
+- **El nombre lleva fecha Y hora** (local, no UTC) para poder guardar varias
+  copias el mismo día sin que una machaque a la otra.
+- **El fallo de permisos se traduce.** Firestore dice «Missing or insufficient
+  permissions», que no explica nada a quien no es programador; el panel dice que
+  hay que entrar con la cuenta de administradora.
+- **Comprobado con A/B**: quitando los historiales de la copia, B1/B2/B3 se ponen
+  en rojo. Los tests cazan el fallo, no pasan por casualidad.
+
+---
+
 ## Batería de smoke tests
 
 Corre automáticamente en **cada despliegue** (job `smoke-tests` del workflow,
@@ -340,7 +369,14 @@ npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview
 | S7e | Nadie puede auto-ascenderse a administrador | ✅ |
 | S7f | Un usuario normal no puede escribir la configuración del reto | ✅ |
 | S7g | Cada usuario puede borrar sus propios datos | ✅ |
-| S13 | El panel de admin ofrece el enlace y el formulario con email | ⏭️ se salta sin credenciales de admin |
+| S13 | El panel de admin: enlace, formulario con email y copia de seguridad | ⏭️ se salta sin credenciales de admin |
+| B1 | La copia no pierde nada: todo lo que entra sale igual | ✅ |
+| B2 | El resumen de la copia cuadra con lo que hay dentro | ✅ |
+| B3 | Caso grande (10×31): no se cae ningún pesaje por el camino | ✅ |
+| B4 | Sin datos no revienta (y dice la verdad) | ✅ |
+| B5 | Una persona sin historial no rompe el recuento | ✅ |
+| B6 | El fichero lleva fecha, hora y versión del formato | ✅ |
+| B7 | No se descarta ningún campo: lo nuevo entra solo | ✅ |
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada

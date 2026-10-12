@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 
 /**
  * Comprobación de la pantalla de ADMINISTRADOR (la que solo ve la dueña del
@@ -74,4 +75,50 @@ test('S13 - el panel de admin ofrece el enlace para invitar y el formulario con 
   await page.getByRole('button', { name: /Añadir/i }).click();
   await expect(page.getByPlaceholder(/Email con el que entrará/i)).toBeVisible();
   await expect(page.getByText(/tiene que registrarse con ese mismo email/i)).toBeVisible();
+
+  // 3) La copia de seguridad: al pulsar, se descarga un fichero con TODO.
+  //    Esta es la comprobación que de verdad importa de la pantalla: que la copia
+  //    salga y traiga los datos, no solo que el botón exista.
+  await expect(page.getByText(/Copia de seguridad/i)).toBeVisible();
+  const [descarga] = await Promise.all([
+    page.waitForEvent('download', { timeout: 30_000 }).catch(() => null),
+    page.getByRole('button', { name: /Descargar copia de seguridad/i }).click(),
+  ]);
+  expect(descarga, 'Al pulsar el botón debería descargarse un fichero').not.toBeNull();
+
+  if (descarga) {
+    expect(descarga.suggestedFilename()).toMatch(/^fitclub-copia-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
+
+    // Y que el fichero traiga los datos de verdad, no un JSON vacío.
+    const ruta = await descarga.path();
+    const contenido = readFileSync(ruta as string, 'utf8');
+    const copia = JSON.parse(contenido);
+
+    expect(copia.aplicacion).toBe('FitClub');
+    expect(copia.tipo).toBe('copia-de-seguridad');
+    expect(copia.ranking.length, 'La copia debería traer el ranking').toBeGreaterThan(0);
+    expect(copia.personas.length, 'La copia debería traer las personas').toBeGreaterThan(0);
+
+    // Los historiales son lo que no se puede recuperar de ninguna otra forma:
+    // no puede venir la lista vacía de contenido.
+    const pesajes = copia.personas.reduce(
+      (t: number, p: { history?: unknown[] }) => t + (Array.isArray(p.history) ? p.history.length : 0),
+      0,
+    );
+    expect(pesajes, 'La copia debería traer los pesajes').toBeGreaterThan(0);
+    expect(copia.resumen.pesajes, 'El resumen debe cuadrar con el contenido').toBe(pesajes);
+
+    // El nombre real y el historial tienen que estar: es la razón de la copia.
+    const conNombre = copia.personas.filter((p: { realName?: string }) => (p.realName ?? '').length > 0);
+    expect(conNombre.length, 'Las personas deberían llevar su nombre real').toBeGreaterThan(0);
+
+    console.log(
+      `Copia verificada: ${copia.resumen.participantes} participantes, ` +
+        `${copia.resumen.personas} personas, ${pesajes} pesajes ` +
+        `(${descarga.suggestedFilename()}, ${Math.round(contenido.length / 1024)} KB)`,
+    );
+  }
+
+  // El panel confirma con un mensaje claro, no en silencio
+  await expect(page.getByText(/Copia descargada/i)).toBeVisible({ timeout: 15_000 });
 });

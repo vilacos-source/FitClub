@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Trash2, ShieldCheck, ShieldAlert, Plus, Share2, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Trash2, ShieldCheck, ShieldAlert, Plus, Share2, Copy, Check, AlertTriangle, Download, Database } from 'lucide-react';
 import { CompetitionConfig, RankedUser } from '../types';
+import type { ResumenCopia } from '../services/backup';
 
 interface AdminSettingsProps {
   config: CompetitionConfig;
@@ -10,13 +11,43 @@ interface AdminSettingsProps {
   onRemoveUser: (userId: string) => void;
   onAddUser: (userData: { realName: string, email: string, pseudonym: string, initialWeight: number }) => void;
   onToggleAdmin: (userId: string) => void;
+  /** Junta todos los datos y los descarga como fichero. Devuelve el resumen. */
+  onExportar: () => Promise<ResumenCopia>;
 }
 
-const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, users, onRemoveUser, onAddUser, onToggleAdmin }) => {
+const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, users, onRemoveUser, onAddUser, onToggleAdmin, onExportar }) => {
   const [formData, setFormData] = useState<CompetitionConfig>(config);
   const [userToDelete, setUserToDelete] = useState<RankedUser | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [copia, setCopia] = useState<{
+    estado: 'quieto' | 'haciendo' | 'hecho' | 'error';
+    resumen?: ResumenCopia;
+    mensaje?: string;
+  }>({ estado: 'quieto' });
+
+  /**
+   * Descarga una copia de TODO. Es lo único de esta pantalla que puede evitar un
+   * daño irreversible: si se pierden los pesajes, no hay forma de recuperarlos.
+   */
+  const hacerCopia = async () => {
+    setCopia({ estado: 'haciendo' });
+    try {
+      const resumen = await onExportar();
+      setCopia({ estado: 'hecho', resumen });
+    } catch (e) {
+      const codigo = String((e as { code?: string })?.code ?? (e as Error)?.message ?? e);
+      // El fallo más probable aquí es leer sin permisos. El mensaje que devuelve
+      // Firestore ("Missing or insufficient permissions") no explica nada a
+      // quien no es programador, así que se traduce.
+      setCopia({
+        estado: 'error',
+        mensaje: codigo.includes('permission-denied')
+          ? 'Tu cuenta no tiene permisos de administradora. Entra con la cuenta de administradora del reto.'
+          : codigo,
+      });
+    }
+  };
 
   const [newUser, setNewUser] = useState({
     realName: '',
@@ -261,6 +292,51 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Copia de seguridad */}
+      <div className="card p-5 rounded-3xl space-y-3">
+        <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
+          <Database className="w-4 h-4 text-indigo-500" />
+          Copia de seguridad
+        </h3>
+        <p className="text-xs text-slate-500">
+          Los pesajes de todo el grupo <b>solo existen aquí</b>. Descárgate una copia de vez en cuando y
+          guárdala en un sitio seguro (tu ordenador, tu correo, un pendrive). Si algún día se pierden
+          estos datos, <b>no hay forma de recuperarlos</b>.
+        </p>
+        <button
+          type="button"
+          onClick={hacerCopia}
+          disabled={copia.estado === 'haciendo'}
+          className="w-full btn-primary text-white text-sm font-bold py-2.5 rounded-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+        >
+          <Download className="w-4 h-4" />
+          {copia.estado === 'haciendo' ? 'Preparando la copia…' : 'Descargar copia de seguridad'}
+        </button>
+
+        {copia.estado === 'hecho' && copia.resumen && (
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-xs text-emerald-800 space-y-1">
+            <p className="font-bold">
+              Copia descargada: {copia.resumen.participantes}{' '}
+              {copia.resumen.participantes === 1 ? 'participante' : 'participantes'} y{' '}
+              {copia.resumen.pesajes} {copia.resumen.pesajes === 1 ? 'pesaje' : 'pesajes'}.
+            </p>
+            <p className="text-[11px] text-emerald-700 break-all">
+              {copia.resumen.fichero} · {copia.resumen.tamanoKB} KB
+            </p>
+            <p className="text-[11px] text-emerald-700">
+              Búscalo en las <b>descargas</b> de tu móvil u ordenador.
+            </p>
+          </div>
+        )}
+
+        {copia.estado === 'error' && (
+          <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 text-xs text-rose-700">
+            <p className="font-bold mb-0.5">No se pudo hacer la copia</p>
+            <p className="break-all">{copia.mensaje}</p>
+          </div>
+        )}
       </div>
 
       {/* Modal de Confirmación de Borrado */}
