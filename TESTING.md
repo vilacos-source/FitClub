@@ -286,6 +286,35 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### Panel de administrador: invitar por WhatsApp y alta manual ✅ aplicado
+- **Tarjeta "Invitar al reto"** en el panel: el enlace a la vista, botón que abre
+  WhatsApp con el mensaje ya escrito y botón de copiar. El enlace se calcula en
+  vivo (`window.location.origin + pathname`), así que vale igual en la web
+  publicada que en una prueba en local.
+- **Arreglo: los apuntados a mano no podían entrar.** Se creaban con un
+  identificador inventado, no el de su cuenta de acceso, así que al registrarse
+  esa persona salían **dos perfiles** (la ficha vacía + su perfil real). Ahora el
+  formulario pide el email y la clave se **deriva** de él; al registrarse, la
+  ficha apuntada se borra sola.
+- **Firebase NO deja saber si un email ya tiene cuenta, y es a propósito.**
+  Comprobado contra la API real: `createAuthUri` responde 200 pero **sin** el
+  campo `registered` (solo aparece si el proveedor de "enlace por email" está
+  activo), y `signInWithPassword` devuelve **el mismo** `INVALID_LOGIN_CREDENTIALS`
+  con una cuenta que existe y con una que no. Es anti-enumeración: nadie puede
+  averiguar quién está registrado en un sitio. Por eso el alta no puede
+  "vincularse" a una cuenta: no hay forma de encontrarla.
+- **El panel NO puede cambiar el rol de nadie desde la app.** Se intentó hacer
+  admin a otra persona: las reglas lo bloquean a propósito (si no, cualquiera
+  podría ascenderse). Para que alguien sea admin hay que añadir su email a
+  `adminEmails()` en `firestore.rules` **y** a `ADMIN_EMAILS` en `App.tsx`, y
+  desplegar. Es un cambio de permisos, no un ajuste de interfaz.
+- **Un test que necesita cuenta de admin tiene que SALTARSE si no hay
+  credenciales.** La CI ejecuta todo `tests/e2e/`, y allí no hay cuenta de admin:
+  sin el `test.skip` la batería entera saldría roja por una pantalla que solo
+  existe para la dueña, tapando fallos reales.
+
+---
+
 ## Batería de smoke tests
 
 Corre automáticamente en **cada despliegue** (job `smoke-tests` del workflow,
@@ -311,6 +340,7 @@ npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview
 | S7e | Nadie puede auto-ascenderse a administrador | ✅ |
 | S7f | Un usuario normal no puede escribir la configuración del reto | ✅ |
 | S7g | Cada usuario puede borrar sus propios datos | ✅ |
+| S13 | El panel de admin ofrece el enlace y el formulario con email | ⏭️ se salta sin credenciales de admin |
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada
