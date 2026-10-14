@@ -51,6 +51,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onRegister }) => {
         <div className="w-20 h-20 grad-brand rounded-3xl flex items-center justify-center text-white text-4xl font-black shadow-xl mb-8">F</div>
         <h1 className="text-4xl font-black text-slate-900 mb-4">FitClub <br/><span className="text-indigo-600 text-2xl">Cloud Edition</span></h1>
         <p className="text-slate-500 mb-10 text-lg">Ahora tus progresos se sincronizan con todo el grupo en tiempo real.</p>
+        {/* CAMBIO DE PRUEBA de la vista previa: sirve para demostrar que un cambio
+            llega primero aquí y NO a la web del grupo. Se borra con la rama. */}
+        <p className="text-amber-600 text-sm font-bold mb-6">· prueba de vista previa</p>
         
         <div className="w-full space-y-4">
           <button onClick={() => setMode('signup')} className="w-full btn-primary font-bold py-4 rounded-2xl active:scale-95 transition-all">Empezar el Reto</button>
