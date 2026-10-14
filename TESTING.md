@@ -430,11 +430,23 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   hace es que el grupo no se la encuentre: la URL que ellos usan no cambia.
 - **La vista previa lee los datos REALES** (misma base de datos), así que sirve para
   ver cómo queda, no para probar cosas que borren o cambien datos de verdad.
-- **Cómo se usa:** se empuja el cambio a la rama `preview` → aparece en
-  `/preview/` → Elena lo mira en el móvil → se pasa a `main`. Borrar la rama
-  `preview` retira la vista previa en el siguiente despliegue.
-- Con la rama `preview` sin existir, **todo esto queda inerte**: se publica solo la
-  app real, como antes.
+- **HALLAZGO IMPORTANTE: GitHub Pages rechaza la publicación si el flujo no sale de
+  la rama principal.** No está claro en su documentación. Se descubrió a base de
+  intentos: con un disparador por push a la rama de vista previa, **la compilación
+  pasaba y el despliegue fallaba una y otra vez** (`Timeout reached` el primero,
+  `Deployment cancelled` después); el mismo trabajo lanzado desde `main` funcionaba
+  a la primera. Por eso **la publicación sale siempre de `main`**, y hay una guarda
+  al principio del flujo que lo comprueba y lo explica si alguien lo cambia.
+- **Cómo se usa:** se deja el cambio en una rama (la de vista previa), se **lanza el
+  flujo desde `main`** indicando qué rama previsualizar (campo `vista`), aparece en
+  `/preview/`, Elena lo mira en el móvil, y se pasa a `main`. Lanzarlo con `vista`
+  vacío **retira** la vista previa.
+- **La CI prueba la vista previa, no la app real**, cuando es ella la que se
+  publica: eso es lo que hay que verificar antes de que lo vea nadie.
+- **Comprobado de punta a punta en la web real** con un cambio de prueba: aparecía
+  en el bundle de `/FitClub/preview/` y **no** en el de `/FitClub/`.
+- Lanzar el flujo **sin indicar rama** deja todo inerte: se publica solo la app
+  real, como antes.
 
 ---
 
