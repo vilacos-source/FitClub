@@ -344,6 +344,49 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### Aviso automático si la web se cae o las reglas se abren ✅ aplicado
+- **`scripts/health-check.mjs`** comprueba cuatro cosas que fallan de verdad:
+  1. La web carga con el armazón de la app, y **el bundle y el CSS responden 200**
+     → es el **INC-001** (assets 404 = pantalla en blanco para todos).
+  2. **Los ficheros publicados son del MISMO despliegue**: el `buildId` que
+     anuncia `version.json` tiene que estar **incrustado dentro del bundle**
+     servido. Es lo que caza el **INC-013** (dos despliegues compitiendo, sitio a
+     medias o viejo). Comprobado con un despliegue falso descuadrado: lo detecta y
+     dice cuál es el fichero descolocado.
+  3. La base de datos responde y la configuración del reto se puede leer.
+  4. **Las reglas siguen cerradas**, reutilizando la sonda ya probada
+     (`scripts/probe-rules.mjs`) en vez de reimplementar las comprobaciones.
+- **Modo `--silencioso`, patrón vigilante:** no imprime nada si todo va bien y
+  solo habla si hay un problema. Es lo que permite que la tarea programada no
+  mande un mensaje cada 6 horas diciendo "todo bien" (que se ignora enseguida y
+  acaba tapando el aviso que importa).
+- **Corre en cada despliegue** (paso nuevo en la CI, después de los smoke tests):
+  si el sitio sale mal publicado, el despliegue queda marcado en rojo.
+- **Y cada 6 horas** como tarea programada, que avisa a Elena por Telegram.
+  OJO: esa tarea vive en esta máquina, así que **si la máquina está apagada, no
+  comprueba nada** y no avisa. No sustituye a mirar la web de vez en cuando.
+
+### Test de las dos listas de administradores ✅ aplicado
+- El email de admin está en **dos sitios**: `ADMIN_EMAILS` en `App.tsx` (decide si
+  se ve el panel) y `adminEmails()` en `firestore.rules` (**la que manda**, decide
+  quién puede escribir). Si se desajustan no falla nada visible, pasan cosas raras:
+  el panel se abre y no deja guardar, o alguien tiene permisos y no ve el panel.
+- `tests/e2e/config-admin.spec.ts` (C1) compara las dos listas y, si difieren,
+  **dice qué email sobra y en cuál de los dos sitios está**. Corre en CI: no
+  necesita navegador ni credenciales.
+- **Guarda contra un falso "todo bien":** si alguien cambia el formato de una de
+  las listas, una búsqueda ingenua no encontraría nada, las dos quedarían vacías y
+  comparadas darían iguales. El test exige que las dos listas se hayan leído **no
+  vacías**, así que un cambio de formato falla ruidosamente con un mensaje que
+  explica qué hacer.
+- Comprobado con A/B: añadiendo un email solo en la app, C1 falla señalándolo;
+  renombrando la constante, falla con "no se encontró la lista".
+- **De paso se corrigió un comentario falso** en `App.tsx` que decía que la lista
+  estaba también en `services/firebase.ts`, fichero que no la tiene: una pista
+  falsa de las que hacen perder el rato buscando dónde está la diferencia.
+
+---
+
 ## Batería de smoke tests
 
 Corre automáticamente en **cada despliegue** (job `smoke-tests` del workflow,
@@ -377,6 +420,9 @@ npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview
 | B5 | Una persona sin historial no rompe el recuento | ✅ |
 | B6 | El fichero lleva fecha, hora y versión del formato | ✅ |
 | B7 | No se descarta ningún campo: lo nuevo entra solo | ✅ |
+| C1 | Las dos listas de administradores (app y reglas) dicen lo mismo | ✅ |
+| C2 | El email de admin no depende de mayúsculas ni espacios | ✅ |
+| V | Vigilante de la web publicada (`scripts/health-check.mjs`) | ✅ corre en cada despliegue |
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada

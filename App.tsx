@@ -42,7 +42,12 @@ import {
  * Debe coincidir con la lista `adminEmails()` de `firestore.rules`.
  * Las reglas de Firestore no permiten que un usuario se auto-nombre admin
  * (sería una escalada de privilegios), así que serlo se decide por esta lista.
- * Debe coincidir también con `ADMIN_EMAILS` en `services/firebase.ts`.
+ *
+ * Esa coincidencia la vigila un test (`C1` en `tests/e2e/config-admin.spec.ts`):
+ * si las dos listas se desajustan, falla diciendo qué email sobra y en cuál de
+ * los dos sitios. Antes este comentario decía que la lista estaba también en
+ * `services/firebase.ts`, que no la tiene: una pista falsa de las que hacen
+ * perder el rato buscando dónde está la diferencia.
  */
 const ADMIN_EMAILS = ['vilacos@gmail.com'];
 

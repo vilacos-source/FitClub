@@ -61,6 +61,13 @@ jobs:
         run: npx playwright test --reporter=list
         env:
           BASE_URL: https://vilacos-source.github.io/FitClub/
+      - name: Vigilante de la web publicada (sitio y reglas)
+        # Comprueba que la web está en pie, que los ficheros publicados son del
+        # MISMO despliegue (caza el INC-013) y que las reglas siguen cerradas
+        # (esto último no lo mira la batería de navegador).
+        run: node scripts/health-check.mjs
+        env:
+          BASE_URL: https://vilacos-source.github.io/FitClub/
       - name: Publicar informe de resultados
         if: always()
         uses: actions/upload-artifact@v4
