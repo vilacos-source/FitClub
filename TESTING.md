@@ -341,6 +341,10 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   hay que entrar con la cuenta de administradora.
 - **Comprobado con A/B**: quitando los historiales de la copia, B1/B2/B3 se ponen
   en rojo. Los tests cazan el fallo, no pasan por casualidad.
+- **Verificado de punta a punta el 14/10/2026 por la dueña del reto**: pulsó el
+  botón desde el panel y confirmó que la copia descargada es correcta. Era la
+  última pieza que el asistente no podía comprobar por su cuenta (leer los
+  historiales de todos exige sesión de administradora). Queda cerrada.
 
 ---
 
