@@ -460,6 +460,15 @@ npm run test:smoke          # contra la web publicada
 npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview)
 ```
 
+**Ojo con un rojo de S8 justo después de un despliegue.** S8 recarga la app, y GitHub
+Pages tarda un poco en servir los ficheros nuevos: el navegador puede pedir un bundle
+que acaba de desaparecer y quedarse en blanco (el mecanismo del **INC-012**). Pasó de
+verdad: S8 falló dos veces seguidas tras publicar y **pasó al relanzar el mismo
+trabajo sin tocar una línea** — no era una avería. Por eso el flujo **espera a que la
+web sirva su bundle** antes de lanzar la batería. Un falso rojo es peor que no tener
+pruebas, porque enseña a ignorar el rojo. Si vuelve a pasar: **relanza antes de
+investigar**, y solo si falla otra vez mira el código.
+
 | Test | Qué verifica | Estado |
 |------|--------------|--------|
 | S1 | La app carga y monta el landing (no página en blanco) | ✅ pasa |

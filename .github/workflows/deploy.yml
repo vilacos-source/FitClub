@@ -149,6 +149,26 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Esperar a que la web sirva el despliegue nuevo
+        # GitHub Pages tarda un poco en servir los ficheros nuevos después de
+        # publicar. Las pruebas que RECARGAN la app (S8) pueden coger el cambio a
+        # medias y dar un fallo falso: el navegador pide un bundle que acaba de
+        # desaparecer y la pantalla queda en blanco (el mecanismo del INC-012).
+        # Un falso rojo es peor que no tener pruebas, porque enseña a ignorarlas.
+        run: |
+          BASE="${{ inputs.vista != '' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}"
+          for intento in $(seq 1 10); do
+            HTML=$(curl -s --max-time 20 "$BASE")
+            JS=$(echo "$HTML" | grep -o 'assets/index-[A-Za-z0-9_-]*\.js' | head -1)
+            if [ -n "$JS" ] && curl -sf -o /dev/null --max-time 20 "$BASE$JS"; then
+              echo "La web ya sirve su bundle ($JS)."
+              exit 0
+            fi
+            echo "Intento $intento: el despliegue aún no está servido del todo; espero 8s."
+            sleep 8
+          done
+          echo "La web no termina de servir su bundle: las pruebas darían falsos fallos."
+          exit 1
       - name: Batería de smoke tests contra el despliegue
         # Si lo que se acaba de publicar es la VISTA PREVIA, las pruebas van contra
         # ella: eso es lo que hay que comprobar antes de que lo vea nadie. Si no,
