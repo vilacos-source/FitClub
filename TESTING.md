@@ -391,6 +391,53 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### Probar los cambios antes de publicarlos: la vista previa ✅ aplicado
+- **El problema:** cada push a `main` salía directo a la URL que usa el grupo, así
+  que un cambio roto lo veían ellos antes que Elena.
+- **La vista previa vive en la misma web, un piso más abajo**:
+  `https://vilacos-source.github.io/FitClub/preview/`. No es un sitio aparte.
+- **Por qué ahí y no en un sitio separado:** GitHub Pages publica **un solo sitio
+  por repositorio** y cada despliegue **reemplaza el sitio entero**, así que no se
+  puede desplegar la vista previa por su cuenta (borraría la app real). Tampoco hay
+  vista previa nativa: la opción `preview` de `deploy-pages` está en alfa y «no
+  disponible al público», y las acciones de terceros que hacen previews **no
+  funcionan con `build_type: workflow`**, que es como está configurado esto.
+  Comprobado antes de construir nada.
+- **La app real se compila SIEMPRE desde `main`**, sea cual sea la rama que dispare
+  el flujo (`ref: main` explícito en el checkout). Sin eso, un push a la rama de
+  vista previa publicaría el borrador en la URL del grupo: exactamente lo que esto
+  existe para evitar.
+- **La vista previa se compila con su propia ruta base** (`/FitClub/preview/`) y su
+  propio `version.json` (buildId `vista-<sha>`), así que la recarga automática de
+  cada una no se mezcla con la de la otra.
+- **Lleva un aviso ámbar fijo arriba** («VISTA PREVIA · esto NO es lo que ve el
+  grupo»), que se ve **también si la app está rota o en blanco** — que es justo
+  cuando más importa saber qué versión se está mirando. Se añade con
+  `scripts/marcar-vista-previa.mjs`, y el marcador que se aplica es el de `main`
+  (no el de la rama en pruebas): una vista previa no debería poder quitarse su
+  propio aviso.
+- **El aviso no tapa nada:** desplaza la cabecera (`header { top: 30px }`, porque es
+  `sticky; top: 0`) y reserva su alto en el `body`. Verificado en un navegador de
+  390×844 y a ojo en la captura: la cabecera de la app queda entera debajo.
+- **Dos comprobaciones paran el despliegue** si algo va mal: que la vista previa
+  **sí** lleve el aviso (una vista previa indistinguible de la real es peor que no
+  tenerla) y que la app real **no** lo lleve (el grupo vería el aviso ámbar). Los
+  dos fallos son peores que no tener la función.
+- **La CI prueba la vista previa, no la app real**, cuando lo que se publica es la
+  vista previa: eso es lo que hay que verificar antes de que lo vea nadie.
+- **Lleva `noindex`**, para que un borrador a medias no acabe listado en Google.
+  OJO: **eso no la hace privada.** Quien tenga la dirección la puede abrir. Lo que
+  hace es que el grupo no se la encuentre: la URL que ellos usan no cambia.
+- **La vista previa lee los datos REALES** (misma base de datos), así que sirve para
+  ver cómo queda, no para probar cosas que borren o cambien datos de verdad.
+- **Cómo se usa:** se empuja el cambio a la rama `preview` → aparece en
+  `/preview/` → Elena lo mira en el móvil → se pasa a `main`. Borrar la rama
+  `preview` retira la vista previa en el siguiente despliegue.
+- Con la rama `preview` sin existir, **todo esto queda inerte**: se publica solo la
+  app real, como antes.
+
+---
+
 ## Batería de smoke tests
 
 Corre automáticamente en **cada despliegue** (job `smoke-tests` del workflow,
@@ -427,6 +474,12 @@ npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview
 | C1 | Las dos listas de administradores (app y reglas) dicen lo mismo | ✅ |
 | C2 | El email de admin no depende de mayúsculas ni espacios | ✅ |
 | V | Vigilante de la web publicada (`scripts/health-check.mjs`) | ✅ corre en cada despliegue |
+| V1 | La marca de vista previa: aviso, noindex, título y hueco para la cabecera | ✅ |
+| V2 | La marca no rompe la app: sobrevive todo lo que había | ✅ |
+| V3 | Aplicarla dos veces no duplica nada | ✅ |
+| V4 | Sin `<body>` falla en vez de servir una vista previa sin marcar | ✅ |
+| V5 | En el navegador el aviso se ve de verdad, arriba y a lo ancho | ✅ |
+| V6 | La versión real NO lleva la marca | ✅ |
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada

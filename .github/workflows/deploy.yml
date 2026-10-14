@@ -1,8 +1,11 @@
 name: Deploy to GitHub Pages
 
+# Se dispara al publicar la app real (`main`) y también al actualizar la vista
+# previa (`preview`). En los dos casos se construye la app real desde `main`; lo
+# único que cambia es si además se añade la vista previa.
 on:
   push:
-    branches: [main]
+    branches: [main, preview]
   workflow_dispatch:
 
 permissions:
@@ -18,7 +21,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # La app REAL se compila SIEMPRE desde `main`, sea cual sea la rama que haya
+      # disparado esto. Sin este `ref`, un push a la vista previa compilaría la
+      # vista previa y la publicaría en la URL que usa el grupo: exactamente lo
+      # que esta opción existe para evitar. No quitar.
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -28,8 +37,70 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VITE_BASE_PATH: /FitClub/
+
+      - name: ¿Hay rama de vista previa?
+        id: vista
+        run: |
+          if git ls-remote --exit-code --heads origin preview > /dev/null 2>&1; then
+            echo "hay=si" >> "$GITHUB_OUTPUT"
+          else
+            echo "hay=no" >> "$GITHUB_OUTPUT"
+            echo "No hay rama 'preview': se publica solo la app real."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.vista.outputs.hay == 'si'
+        with:
+          ref: preview
+          path: _vista
+
+      # GitHub Pages publica UN sitio por repositorio (cada despliegue reemplaza el
+      # sitio entero), así que la vista previa no se puede desplegar por separado:
+      # viaja dentro del MISMO despliegue, en una carpeta de más abajo.
+      - name: Compilar la vista previa en /preview/
+        if: steps.vista.outputs.hay == 'si'
+        run: |
+          cd _vista
+          npm ci
+          VITE_BASE_PATH=/FitClub/preview/ VITE_BUILD_ID="vista-${GITHUB_SHA::8}" \
+            npx vite build --outDir "$GITHUB_WORKSPACE/dist/preview" --emptyOutDir
+          # El marcador es el de `main` (ruta absoluta), no el de la rama en
+          # pruebas: una vista previa no debería poder quitarse su propio aviso.
+          node "$GITHUB_WORKSPACE/scripts/marcar-vista-previa.mjs" "$GITHUB_WORKSPACE/dist/preview"
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      # Estas dos comprobaciones son la red de seguridad de todo el invento: si el
+      # aviso no se aplica, la vista previa es indistinguible de la real; y si se
+      # aplica a la real, el grupo ve el aviso. Los dos fallos son peores que no
+      # tener vista previa, así que aquí se para el despliegue.
+      - name: La vista previa lleva su aviso
+        if: steps.vista.outputs.hay == 'si'
+        run: |
+          if ! grep -q 'aviso-vista-previa' dist/preview/index.html; then
+            echo "La vista previa se ha compilado SIN su aviso: no se publica."
+            exit 1
+          fi
+          echo "La vista previa lleva su aviso."
+
+      - name: La app real NO lleva el aviso
+        run: |
+          if grep -q 'aviso-vista-previa' dist/index.html; then
+            echo "La marca de vista previa ha acabado en la app REAL: no se publica."
+            exit 1
+          fi
+          echo "La app real está limpia."
+
       - name: SPA fallback
         run: cp dist/index.html dist/404.html
+
+      - name: Qué se va a publicar
+        run: |
+          echo "app real:     $(grep -o 'assets/index-[A-Za-z0-9_-]*\.js' dist/index.html | head -1)"
+          if [ -f dist/preview/index.html ]; then
+            echo "vista previa: $(grep -o 'assets/index-[A-Za-z0-9_-]*\.js' dist/preview/index.html | head -1) en /preview/"
+          fi
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -58,16 +129,19 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Batería de smoke tests contra el despliegue
+        # Si lo que se acaba de publicar es la VISTA PREVIA, las pruebas van contra
+        # ella: eso es lo que hay que comprobar antes de que lo vea nadie. Si no,
+        # contra la web real.
         run: npx playwright test --reporter=list
         env:
-          BASE_URL: https://vilacos-source.github.io/FitClub/
+          BASE_URL: ${{ github.ref_name == 'preview' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
       - name: Vigilante de la web publicada (sitio y reglas)
         # Comprueba que la web está en pie, que los ficheros publicados son del
         # MISMO despliegue (caza el INC-013) y que las reglas siguen cerradas
         # (esto último no lo mira la batería de navegador).
         run: node scripts/health-check.mjs
         env:
-          BASE_URL: https://vilacos-source.github.io/FitClub/
+          BASE_URL: ${{ github.ref_name == 'preview' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
       - name: Publicar informe de resultados
         if: always()
         uses: actions/upload-artifact@v4
