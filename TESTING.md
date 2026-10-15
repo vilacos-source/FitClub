@@ -403,7 +403,25 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 - La contraseña de esa cuenta **la genera el asistente y no pasa por el chat**, y la
   cuenta **se borra al terminar la comprobación**, así que no deja rastro en el
   ranking.
-- Si algún día se quiere fuera, hay que quitarla **de las dos listas** y republicar
+- **Comprobado a mano el 15/10/2026, con esa cuenta desechable.** Resultado:
+  - El panel abre y **el alta se permite de verdad** — eso demuestra que las reglas
+    publicadas y el `ADMIN_EMAILS` desplegado coinciden (si no, el alta daría
+    «permisos insuficientes», sin más aviso).
+  - La tarjeta de invitar muestra el enlace a la vista; el botón de WhatsApp
+    construye el mensaje con **las fechas y el premio reales** («10/10/2026 –
+    9/11/2026», «Una copita de vino»); el formulario de alta pide el email con el
+    aviso correspondiente.
+  - **La copia de seguridad se descargó y se abrió**: 7 participantes, 7 personas,
+    4 pesajes, 7 nombres reales, configuración del reto incluida, y el resumen
+    cuadrando con el contenido. Los números cuadran con lo que ve la app (Mona 3
+    pesajes y 5,7 kg; Pepita 1 y −3 kg; el resto sin pesarse).
+  - **Borrada después y comprobado**: los dos documentos ya no están (leído después
+    de borrar) y la cuenta de acceso ya no deja entrar. No queda nada en el ranking.
+- **Un límite encontrado al verificar:** listar una colección por la API de Firestore
+  con la sesión devuelve **403**, aunque la app sí puede listar (es como se descargó
+  la copia). Es una restricción de la clave, no de los datos ni de las reglas. Se
+  verificó comparando la copia con lo que muestra la propia app.
+- Si algún día se quiere quitar, hay que borrarla **de las dos listas** y republicar
   las reglas; si se quita de una sola, el test C1 falla — con razón.
 
 ---
@@ -501,7 +519,7 @@ investigar**, y solo si falla otra vez mira el código.
 | S7e | Nadie puede auto-ascenderse a administrador | ✅ |
 | S7f | Un usuario normal no puede escribir la configuración del reto | ✅ |
 | S7g | Cada usuario puede borrar sus propios datos | ✅ |
-| S13 | El panel de admin: enlace, formulario con email y copia de seguridad | ⏭️ se salta sin credenciales de admin |
+| S13 | El panel de admin: enlace, formulario con email y copia de seguridad | ⏭️ se salta sin credenciales de admin (verificado a mano el 15/10/2026) |
 | B1 | La copia no pierde nada: todo lo que entra sale igual | ✅ |
 | B2 | El resumen de la copia cuadra con lo que hay dentro | ✅ |
 | B3 | Caso grande (10×31): no se cae ningún pesaje por el camino | ✅ |
