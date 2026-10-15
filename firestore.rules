@@ -20,8 +20,11 @@ service cloud.firestore {
     // Administradores por email. Debe coincidir con ADMIN_EMAILS en App.tsx.
     // El rol se decide aquí, no por un campo escribible por el propio usuario
     // (eso sería una escalada de privilegios).
+    // `vilacos+prueba` es una cuenta de PRUEBA desechable para comprobar la
+    // pantalla de administrador sin la contraseña real. Debe coincidir con
+    // `ADMIN_EMAILS` en App.tsx (hay un test, C1, que lo vigila).
     function adminEmails() {
-      return ['vilacos@gmail.com'];
+      return ['vilacos@gmail.com', 'vilacos+prueba@gmail.com'];
     }
 
     function isAdmin() {

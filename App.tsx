@@ -49,7 +49,13 @@ import {
  * `services/firebase.ts`, que no la tiene: una pista falsa de las que hacen
  * perder el rato buscando dónde está la diferencia.
  */
-const ADMIN_EMAILS = ['vilacos@gmail.com'];
+// `vilacos+prueba` es una cuenta de PRUEBA desechable, para poder comprobar la
+// pantalla de administrador sin la contraseña real de nadie. Es una variante del
+// correo de Elena, así que solo ella puede reclamarla: nadie más podría
+// registrarla para hacerse administrador.
+// Si algún día se quiere fuera, hay que quitarla de aquí Y de `firestore.rules`
+// (de las dos, o el test C1 se queja — con razón).
+const ADMIN_EMAILS = ['vilacos@gmail.com', 'vilacos+prueba@gmail.com'];
 
 /**
  * Clave de documento para un participante apuntado a mano desde el panel.

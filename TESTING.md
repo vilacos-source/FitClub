@@ -391,6 +391,23 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### Cuenta de prueba para comprobar la pantalla de administrador ✅ aplicado
+- La pantalla de admin (la tarjeta de invitar, el alta con email y la copia de
+  seguridad) **no se puede comprobar sin una cuenta con permisos**. El test S13 se
+  salta sin credenciales, para no poner la CI en rojo por una pantalla que no puede
+  alcanzar.
+- Se añadió **`vilacos+prueba@gmail.com`** a las DOS listas (app y reglas). Es una
+  variante del correo de Elena, así que **solo ella puede reclamarla**: nadie más
+  podría registrarla para hacerse administrador. Con un correo inventado de
+  cualquier dominio, cualquiera que lo conociera podría: el email es el rol.
+- La contraseña de esa cuenta **la genera el asistente y no pasa por el chat**, y la
+  cuenta **se borra al terminar la comprobación**, así que no deja rastro en el
+  ranking.
+- Si algún día se quiere fuera, hay que quitarla **de las dos listas** y republicar
+  las reglas; si se quita de una sola, el test C1 falla — con razón.
+
+---
+
 ### Probar los cambios antes de publicarlos: la vista previa ✅ aplicado
 - **El problema:** cada push a `main` salía directo a la URL que usa el grupo, así
   que un cambio roto lo veían ellos antes que Elena.
