@@ -490,8 +490,17 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   al principio del flujo que lo comprueba y lo explica si alguien lo cambia.
 - **Cómo se usa:** se deja el cambio en una rama (la de vista previa), se **lanza el
   flujo desde `main`** indicando qué rama previsualizar (campo `vista`), aparece en
-  `/preview/`, Elena lo mira en el móvil, y se pasa a `main`. Lanzarlo con `vista`
-  vacío **retira** la vista previa.
+  `/preview/`, Elena lo mira en el móvil, y se pasa a `main`.
+- **La vista previa ya no se cae sola.** Antes, publicar la app desde `main` la
+  retiraba (lanzar con `vista` vacío = retirar), así que **cada publicación la
+  borraba** y había que volver a publicarla a mano — le pasaba al asistente en cada
+  cambio. Ahora hay una **variable del repositorio** (`VISTA_PREVIA`) que dice qué
+  rama previsualizar por defecto: publicar desde `main` **la mantiene**, y las
+  publicaciones llevan las dos cosas. Para retirarla, se lanza con `vista: ninguna`
+  (o se borra la variable). El campo `vista` sigue mandando cuando se rellena.
+- El flujo define la dirección **una sola vez** para las tres comprobaciones (la
+  espera, la batería y el vigilante): así no pueden discrepar entre ellas y mirar
+  unas a la vista previa y otras a la web real.
 - **La CI prueba la vista previa, no la app real**, cuando es ella la que se
   publica: eso es lo que hay que verificar antes de que lo vea nadie.
 - **Comprobado de punta a punta en la web real** con un cambio de prueba: aparecía

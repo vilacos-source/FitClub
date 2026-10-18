@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       vista:
-        description: 'Rama o commit a publicar como vista previa en /preview/ (vacío = se retira la vista previa)'
+        description: 'Rama o commit a publicar como vista previa (vacío = la que haya puesta; "ninguna" = retirarla)'
         required: false
         default: ''
 
@@ -28,6 +28,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      # Lo usan las pruebas y el vigilante para saber contra qué URL mirar.
+      hay_vista: ${{ steps.vista.outputs.hay }}
     steps:
       # Red de seguridad: si alguien vuelve a poner un disparador desde otra rama,
       # esto lo para con una explicación, en vez de dejar un fallo de publicación
@@ -60,10 +63,19 @@ jobs:
 
       - name: ¿Hay que publicar una vista previa?
         id: vista
+        env:
+          # El campo 'vista' manda. Si viene vacío se usa la variable del repositorio
+          # (VISTA_PREVIA), para que la vista previa NO se caiga cada vez que se
+          # publica la app desde main: antes se caía sola en cada publicación y
+          # había que volver a publicarla a mano. Con 'ninguna' se retira.
+          RAMA: ${{ inputs.vista || vars.VISTA_PREVIA }}
         run: |
-          if [ -n "${{ inputs.vista }}" ]; then
+          rama="$RAMA"
+          if [ "${{ inputs.vista }}" = "ninguna" ]; then rama=""; fi
+          if [ -n "$rama" ]; then
             echo "hay=si" >> "$GITHUB_OUTPUT"
-            echo "Vista previa de: ${{ inputs.vista }}"
+            echo "rama=$rama" >> "$GITHUB_OUTPUT"
+            echo "Vista previa de: $rama"
           else
             echo "hay=no" >> "$GITHUB_OUTPUT"
             echo "Sin vista previa: se publica solo la app real."
@@ -72,7 +84,7 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.vista.outputs.hay == 'si'
         with:
-          ref: ${{ inputs.vista }}
+          ref: ${{ steps.vista.outputs.rama }}
           path: _vista
 
       # GitHub Pages publica UN sitio por repositorio (cada despliegue reemplaza el
@@ -139,8 +151,13 @@ jobs:
 
   smoke-tests:
     # Corre DESPUÉS de desplegar, contra la web real ya publicada.
-    needs: deploy
+    needs: [build, deploy]
     runs-on: ubuntu-latest
+    env:
+      # Si lo que se acaba de publicar es la VISTA PREVIA, todo mira ahí: es lo que
+      # hay que comprobar antes de que lo vea nadie. Define la URL una sola vez para
+      # que las tres comprobaciones no puedan discrepar entre sí.
+      BASE_URL: ${{ needs.build.outputs.hay_vista == 'si' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -156,7 +173,7 @@ jobs:
         # desaparecer y la pantalla queda en blanco (el mecanismo del INC-012).
         # Un falso rojo es peor que no tener pruebas, porque enseña a ignorarlas.
         run: |
-          BASE="${{ inputs.vista != '' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}"
+          BASE="$BASE_URL"
           for intento in $(seq 1 10); do
             HTML=$(curl -s --max-time 20 "$BASE")
             JS=$(echo "$HTML" | grep -o 'assets/index-[A-Za-z0-9_-]*\.js' | head -1)
@@ -174,15 +191,11 @@ jobs:
         # ella: eso es lo que hay que comprobar antes de que lo vea nadie. Si no,
         # contra la web real.
         run: npx playwright test --reporter=list
-        env:
-          BASE_URL: ${{ inputs.vista != '' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
       - name: Vigilante de la web publicada (sitio y reglas)
         # Comprueba que la web está en pie, que los ficheros publicados son del
         # MISMO despliegue (caza el INC-013) y que las reglas siguen cerradas
         # (esto último no lo mira la batería de navegador).
         run: node scripts/health-check.mjs
-        env:
-          BASE_URL: ${{ inputs.vista != '' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
       - name: Publicar informe de resultados
         if: always()
         uses: actions/upload-artifact@v4
