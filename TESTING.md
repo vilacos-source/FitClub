@@ -490,34 +490,44 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   **arrastra el peso del último del anterior**, así que las cuentas salen mal desde
   el primer día.
 - **Lo que se hizo:** un botón por participante, aparte del de dar de baja. Borra
-  sus pesajes y pone puntos y kilos a cero, **y le fija el peso de partida del
-  periodo nuevo**. **No es dar de baja**: la persona sigue en el reto, con su
-  nombre, su foto y su alta.
-- **Los dos borrados van en un solo lote** (`writeBatch`), que se aplica entero o
-  no se aplica. Si fueran dos escrituras sueltas y fallara la segunda, la persona
+  sus pesajes, pone sus puntos y sus kilos a cero y **le borra el peso de partida**.
+  **No es dar de baja**: la persona sigue en el reto, con su nombre, su foto y su
+  alta en la lista.
+- **El peso de partida NO se pregunta ni se inventa**: lo fija **el primer pesaje**
+  del periodo nuevo. Cualquier número que pusiéramos al reiniciar sería de otro
+  momento. Hasta que la persona se pesa, está **«sin empezar»** (peso de partida a
+  cero) y sus kilos perdidos son cero.
+- **El primer pesaje no compara con nada** (diferencia 0): si comparase con el peso
+  del periodo anterior, el primer día se apuntaría una subida o una bajada que no ha
+  ocurrido.
+- **«Sin peso de partida» (cero) se lee en CUATRO sitios** y los cuatro están
+  cubiertos, porque un cero donde hace falta un número se rompe solo: el cálculo de
+  cada pesaje, **el porcentaje del ranking** (dividir por cero da NaN, y un NaN al
+  ordenar deja a la persona en cualquier sitio), la pantalla de inicio («Sin
+  empezar») y el mensaje de la IA (que diría «su peso de salida de 0 kg»). Hay un
+  test solo para el NaN.
+- **Hizo falta cambiar las REGLAS, y en dos sitios:** `initialWeight` pasa a admitir
+  cero (si no, no se puede ni borrar el peso de partida) y el dueño puede fijarlo
+  **solo mientras esté pendiente**. Esa segunda parte es la que protege el juego:
+  sin ella, cualquiera podría reescribir su peso de salida el día que le conviniera y
+  los kilos perdidos no significarían nada. Hay un test que **intenta la trampa y
+  exige que se le deniegue**.
+- **Los dos borrados van en un solo lote** (`writeBatch`), que se aplica entero o no
+  se aplica. Si fueran dos escrituras sueltas y fallara la segunda, la persona
   quedaría con cero pesajes y los puntos viejos: un estado que **no se ve a simple
-  vista** y que falsea el ranking. Mismo criterio que la copia de seguridad («una
-  copia a medias es peor que no tener copia»).
-- **El peso de partida se propone solo**: es su **último pesaje** (lo que pesa
-  ahora), no el peso con el que entró hace un periodo. Si no se puede leer, se deja
-  el de su alta; y si tampoco, se escribe a mano. Y se para **antes** de intentar
-  guardar si el peso es imposible: un cero no lo aceptarían las reglas, y el error
-  que devolvería Firestore («permisos insuficientes») no se parece a la causa.
-- **LAS REGLAS YA LO PERMITÍAN** — un administrador puede escribir los datos de
-  otro. Comprobado **haciendo la petición**, no leyéndolas, así que **no hizo falta
-  publicar reglas nuevas**.
-- **Cubierto por R1–R4.** R1 comprueba la **lista exacta** de campos que se tocan
-  (que no le cambie el nombre, ni la foto, ni el rol), R2 los pesos imposibles, R3
-  que las piezas están conectadas y que el lote lleva **dos** escrituras, y R4 es
-  una prueba **contra la base de datos de verdad**.
-- **R4 se salta sola** salvo que se pida (`PROBAR_REINICIO=si`): crea su propia
-  cuenta de administradora de prueba, apunta un participante de prueba, le hace el
-  reinicio **exactamente como lo hace la app** y **lo borra todo** al terminar. No
-  toca a nadie del grupo y no se ejecuta en cada publicación.
-- **Trampa que costó un falso culpable:** R4 comprobaba la limpieza **después** de
-  cerrar la sesión de prueba, y las lecturas sin sesión las deniegan las reglas →
-  salía un error de permisos que **parecía del reinicio** y no lo era. La limpieza
-  se comprueba con la sesión aún abierta; la cuenta se cierra al final.
+  vista** y que falsea el ranking. Mismo criterio que la copia de seguridad.
+- **Cubierto por R1–R5.** R1 la lista **exacta** de campos que se tocan más que las
+  piezas están conectadas, R2 el primer pesaje, R3 el NaN del ranking, y R4/R5 son
+  pruebas **contra la base de datos de verdad**: R4 que un administrador puede
+  reiniciar a alguien, R5 que el miembro fija su peso de partida con su primer pesaje
+  **y que después ya no puede cambiarlo**.
+- **R4 y R5 se saltan solas** salvo que se pida (`PROBAR_REINICIO=si`): crean sus
+  propias cuentas de prueba, las usan y **lo borran todo** al terminar. No tocan a
+  nadie del grupo y no se ejecutan en cada publicación.
+- **Trampa que costó un falso culpable:** la primera versión comprobaba la limpieza
+  **después** de cerrar la sesión de prueba, y las lecturas sin sesión las deniegan
+  las reglas → salía un error de permisos que **parecía del reinicio** y no lo era.
+  La limpieza se comprueba con la sesión aún abierta; la cuenta se cierra al final.
 
 ---
 
@@ -660,10 +670,11 @@ batería salió verde contando «1 inestable» en lugar de un rojo.)
 | X2 | El HTML trae lo que evita la barra del navegador (iPhone) | ✅ |
 | X3 | Está el fichero que Android exige para instalar con su icono | ✅ |
 | X4 | La app de la vista previa se llama distinto (dos iconos, dos nombres) | ✅ |
-| R1 | Empezar de cero borra el historial y los totales, y NO toca nada más | ✅ |
-| R2 | Un peso de partida imposible se para antes de intentar guardarlo | ✅ |
-| R3 | El reinicio está conectado y escribe los dos documentos en un solo lote | ✅ |
+| R1 | El reinicio borra lo justo, no toca nada más y las piezas están conectadas | ✅ |
+| R2 | El primer pesaje del periodo fija el peso de partida (no compara con nada) | ✅ |
+| R3 | Sin peso de partida, el ranking no se rompe: nada de NaN | ✅ |
 | R4 | Contra la base de datos: un admin puede de verdad poner a cero a alguien | ✅ comprobado · se salta salvo `PROBAR_REINICIO=si` |
+| R5 | Contra la base de datos: el primer pesaje fija el peso de partida y NO se puede cambiar después | ✅ comprobado · se salta salvo `PROBAR_REINICIO=si` |
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada

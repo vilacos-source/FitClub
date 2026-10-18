@@ -4,6 +4,7 @@ import { RefreshCw, TrendingUp, PenLine, History, ChevronLeft, ChevronRight } fr
 import { User, PublicProfile, CompetitionConfig } from '../types';
 import { ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, Cell } from 'recharts';
 import { getMotivationalMessage, getWelcomeMessage } from '../services/geminiService';
+import { sinPesoDePartida } from '../services/pesoDePartida';
 
 interface DashboardProps {
   user: User;
@@ -348,7 +349,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, leaderboard, onAddWeight, c
                 <span className="text-[10px] font-black uppercase leading-none opacity-80">{formatDate(config.startDate).split(' ')[1]}</span>
                 <span className="text-sm font-bold leading-tight">{formatDate(config.startDate).split(' ')[0]}</span>
               </div>
-              <div><p className="text-sm font-black text-slate-800">{user.initialWeight.toFixed(1)} kg</p><p className="text-[10px] font-bold uppercase text-indigo-600 flex items-center gap-1">🚩 Punto de Partida</p></div>
+              <div><p className="text-sm font-black text-slate-800">{sinPesoDePartida(user) ? 'Sin empezar' : `${user.initialWeight.toFixed(1)} kg`}</p><p className="text-[10px] font-bold uppercase text-indigo-600 flex items-center gap-1">🚩 Punto de Partida</p></div>
             </div>
           </div>
         </div>

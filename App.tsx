@@ -37,7 +37,7 @@ import {
   type DocumentoCopiado,
   type ResumenCopia,
 } from './services/backup';
-import { planDeReinicio } from './services/resetMember';
+import { calcularPesaje, planDeReinicio } from './services/pesoDePartida';
 
 /**
  * Emails con permisos de administrador.
@@ -272,11 +272,14 @@ const App: React.FC = () => {
       return;
     }
 
-    const lastWeighIn = currentUser.history.length > 0 
-      ? currentUser.history[currentUser.history.length - 1] 
-      : { weight: currentUser.initialWeight, delta: 0, date: competitionConfig.startDate };
-      
-    const delta = weight - lastWeighIn.weight;
+    // Cuánto ha bajado y cuántos kilos lleva perdidos. Lo calcula un módulo aparte
+    // porque tiene un caso delicado: quien viene de EMPEZAR DE CERO no tiene peso
+    // de partida todavía, y su primer pesaje del periodo no compara con nada — lo
+    // fija él. Comparando con el peso del periodo anterior, el primer día se
+    // apuntaría una subida o una bajada que no ha ocurrido.
+    const calculo = calcularPesaje(currentUser, weight);
+    const delta = calculo.delta;
+    const newLoss = calculo.kilosPerdidos;
     let earnedPoints = 10; 
     const messages: string[] = [];
 
@@ -299,7 +302,6 @@ const App: React.FC = () => {
       messages.push("🌅 ¡Bono Madrugador! (+5 pts)");
     }
 
-    const newLoss = currentUser.initialWeight - weight;
     const oldLoss = currentUser.totalWeightLoss;
     if (Math.floor(newLoss) > Math.floor(oldLoss) && newLoss > 0) {
       earnedPoints += 100;
@@ -326,12 +328,18 @@ const App: React.FC = () => {
       await updateDoc(publicProfileRef(currentUser.id), {
         totalPoints: newTotalPoints,
         totalWeightLoss: newLoss,
+        // Si es el PRIMER pesaje del periodo, manda él: pasa a ser su peso de
+        // partida y se guarda aquí. Es la única vez que se puede fijar (las reglas
+        // lo permiten solo mientras esté pendiente), para que nadie pueda
+        // reescribir su peso de salida más adelante y descuadrar el ranking.
+        ...(calculo.fijaElPesoDePartida ? { initialWeight: weight } : {}),
       });
       setCurrentUser({
         ...currentUser,
         history: newHistory,
         totalPoints: newTotalPoints,
         totalWeightLoss: newLoss,
+        ...(calculo.fijaElPesoDePartida ? { initialWeight: weight } : {}),
       });
       alert(`¡Peso registrado! +${earnedPoints} pts.\n${messages.join('\n')}`);
     } catch (e) {
@@ -449,42 +457,22 @@ const App: React.FC = () => {
   };
 
   /**
-   * Lee el último pesaje de alguien. Solo para administradores.
-   *
-   * Sirve para proponer el peso de partida del periodo nuevo: lo razonable es
-   * empezar por lo que pesa ahora, y eso es su último pesaje. Se lee AQUÍ y no en
-   * la pantalla, para que la pantalla no tenga que saber de Firestore (y para
-   * poder probar la parte que decide sin tocar la red).
-   */
-  const leerUltimoPesaje = async (userId: string): Promise<{ peso: number; fecha: string } | null> => {
-    try {
-      const snap = await getDoc(privateDataRef(userId));
-      if (!snap.exists()) return null;
-      const historial = (snap.data() as PrivateData).history;
-      if (!Array.isArray(historial) || historial.length === 0) return null;
-      const ultimo = historial[historial.length - 1];
-      return { peso: Number(ultimo.weight), fecha: String(ultimo.date) };
-    } catch {
-      // Sin permiso o sin documento no es un fallo: simplemente no hay nada que
-      // proponer, y la pantalla deja escribir el peso a mano.
-      return null;
-    }
-  };
-
-  /**
    * Empezar de cero con un participante: borra sus pesajes, pone sus totales a
-   * cero y le fija un peso de partida nuevo para el periodo que empieza.
+   * cero y le BORRA el peso de partida, para el periodo que empieza.
    *
-   * No es dar de baja: la persona sigue en el reto, con su pseudónimo y su
-   * avatar.
+   * No se le pone un peso de partida a mano a propósito: cualquier número sería de
+   * otro momento. Lo fija su primer pesaje del periodo nuevo (ver
+   * `services/pesoDePartida.ts`).
+   *
+   * No es dar de baja: la persona sigue en el reto, con su pseudónimo y su avatar.
    *
    * Los dos documentos se escriben en UN SOLO LOTE (`writeBatch`), que se aplica
    * entero o no se aplica. Si fueran dos escrituras sueltas y fallara la segunda,
    * la persona quedaría con cero pesajes y los puntos viejos: un estado que no se
    * ve a simple vista y que falsea el ranking.
    */
-  const reiniciarParticipante = async (userId: string, pesoInicial: number) => {
-    const plan = planDeReinicio(pesoInicial);
+  const reiniciarParticipante = async (userId: string) => {
+    const plan = planDeReinicio();
     try {
       const lote = writeBatch(db);
       // El `as UpdateData<...>` está por un choque de tipos, no por inseguridad:
@@ -577,7 +565,6 @@ const App: React.FC = () => {
             users={rankedUsers} 
             onExportar={exportarDatos}
             onResetUser={reiniciarParticipante}
-            onLeerUltimoPesaje={leerUltimoPesaje}
             onRemoveUser={async (id) => {
               if (confirm("¿Estás seguro de que quieres eliminar a este usuario?")) {
                 try {

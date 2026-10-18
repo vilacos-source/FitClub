@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { User, RankedUser, CompetitionConfig } from '../types';
+import { porcentajePerdido } from '../services/pesoDePartida';
 
 interface LeaderboardProps {
   users: RankedUser[];
@@ -13,8 +14,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users, currentUser, config })
     if (b.totalPoints !== a.totalPoints) {
       return b.totalPoints - a.totalPoints;
     }
-    const lossPctA = (a.totalWeightLoss / a.initialWeight) * 100;
-    const lossPctB = (b.totalWeightLoss / b.initialWeight) * 100;
+    // El porcentaje se calcula con `porcentajePerdido` y no aquí a mano: quien
+    // viene de empezar de cero no tiene peso de partida todavía, y dividir por
+    // cero daría NaN — que al ordenar deja a la persona en un sitio cualquiera.
+    const lossPctA = porcentajePerdido(a);
+    const lossPctB = porcentajePerdido(b);
     return lossPctB - lossPctA;
   });
 
@@ -82,7 +86,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ users, currentUser, config })
         {sortedUsers.map((user, index) => {
           const isTop3 = index < 3;
           const medals = ['🥇', '🥈', '🥉'];
-          const lossPercentage = ((user.totalWeightLoss / user.initialWeight) * 100).toFixed(1);
+          const lossPercentage = porcentajePerdido(user).toFixed(1);
 
           return (
             <div 

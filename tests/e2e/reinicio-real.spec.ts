@@ -14,10 +14,11 @@ import {
   getDoc,
   getFirestore,
   setDoc,
+  updateDoc,
   writeBatch,
   type UpdateData,
 } from 'firebase/firestore';
-import { planDeReinicio } from '../../services/resetMember';
+import { SIN_PESO_DE_PARTIDA, calcularPesaje, planDeReinicio } from '../../services/pesoDePartida';
 import type { PrivateData, PublicProfile } from '../../types';
 
 /**
@@ -54,7 +55,7 @@ test('R4 - un administrador puede de verdad poner a cero a un participante', asy
     'Escribe en la base de datos real: se lanza a propósito con PROBAR_REINICIO=si',
   );
 
-  const app = initializeApp(config);
+  const app = initializeApp(config, 'prueba-admin');
   const auth = getAuth(app);
   const db = getFirestore(app, config.firestoreDatabaseId);
 
@@ -102,7 +103,7 @@ test('R4 - un administrador puede de verdad poner a cero a un participante', asy
 
     // 3. El reinicio, EXACTAMENTE como lo hace la app: los dos documentos en un
     //    solo lote, que se aplica entero o no se aplica.
-    const plan = planDeReinicio(85.8);
+    const plan = planDeReinicio();
     const lote = writeBatch(db);
     lote.update(docs.privado, plan.privado as UpdateData<PrivateData>);
     lote.update(docs.publico, plan.publico as UpdateData<Omit<PublicProfile, 'id'>>);
@@ -114,7 +115,10 @@ test('R4 - un administrador puede de verdad poner a cero a un participante', asy
     expect(priv.data()!.history, 'Los pesajes deberían haberse borrado').toEqual([]);
     expect(pub.data()!.totalPoints, 'Los puntos deberían estar a cero').toBe(0);
     expect(pub.data()!.totalWeightLoss, 'Los kilos perdidos deberían estar a cero').toBe(0);
-    expect(pub.data()!.initialWeight, 'Debería partir del peso nuevo').toBe(85.8);
+    expect(
+      pub.data()!.initialWeight,
+      'El peso de partida debería haberse borrado (lo fija su primer pesaje)',
+    ).toBe(SIN_PESO_DE_PARTIDA);
 
     // Y ahora lo que NO se toca: la persona sigue en el reto, igual que estaba.
     expect(pub.data()!.pseudonym, 'No debería cambiarle el pseudónimo').toBe('PruebaReinicio');
@@ -149,4 +153,83 @@ test('R4 - un administrador puede de verdad poner a cero a un participante', asy
     auth.currentUser,
     'La cuenta de administradora de prueba no debería quedar abierta',
   ).toBeNull();
+});
+
+test('R5 - el primer pesaje fija el peso de partida, y después ya no se puede cambiar', async () => {
+  test.skip(
+    process.env.PROBAR_REINICIO !== 'si',
+    'Escribe en la base de datos real: se lanza a propósito con PROBAR_REINICIO=si',
+  );
+
+  const app = initializeApp(config, 'prueba-miembro');
+  const auth = getAuth(app);
+  const db = getFirestore(app, config.firestoreDatabaseId);
+
+  const clave = randomBytes(18).toString('base64url');
+  const EMAIL_MIEMBRO = 'vilacos+prueba-miembro@gmail.com';
+
+  // Se usa una cuenta de MIEMBRO normal (esa dirección no es admin), que es justo
+  // la que tiene que poder fijar su peso de partida con su primer pesaje.
+  let cred;
+  try {
+    cred = await createUserWithEmailAndPassword(auth, EMAIL_MIEMBRO, clave);
+  } catch {
+    cred = await signInWithEmailAndPassword(auth, EMAIL_MIEMBRO, clave);
+  }
+  const ref = doc(db, 'leaderboard', cred.user.uid);
+
+  try {
+    // 1. Cómo queda una persona tras «empezar de cero»: sin peso de partida.
+    await setDoc(ref, {
+      pseudonym: 'PruebaMiembro',
+      avatar: 'https://example.com/foto-de-prueba.png',
+      initialWeight: SIN_PESO_DE_PARTIDA,
+      totalPoints: 0,
+      totalWeightLoss: 0,
+      isAdmin: false,
+    });
+    expect(
+      (await getDoc(ref)).data()!.initialWeight,
+      'Debería poder guardarse «sin peso de partida» (es como queda tras el reinicio)',
+    ).toBe(SIN_PESO_DE_PARTIDA);
+
+    // 2. Su PRIMER pesaje: lo fija él, y los kilos perdidos siguen a cero.
+    const calculo = calcularPesaje(
+      { initialWeight: SIN_PESO_DE_PARTIDA, totalWeightLoss: 0, history: [] },
+      82.4,
+    );
+    expect(calculo.fijaElPesoDePartida, 'El primer pesaje debería fijar el peso de partida').toBe(
+      true,
+    );
+    await updateDoc(ref, { initialWeight: 82.4, totalPoints: 15, totalWeightLoss: 0 });
+    expect((await getDoc(ref)).data()!.initialWeight).toBe(82.4);
+
+    // 3. Y ahora lo que de verdad protege el juego: ya NO lo puede cambiar. Si esto
+    //    pasara, cualquiera podría reescribir su peso de salida el día que le
+    //    conviniera y los kilos perdidos dejarían de significar nada.
+    await expect(
+      updateDoc(ref, { initialWeight: 100, totalPoints: 15, totalWeightLoss: 0 }),
+      'Cambiar el peso de partida ya fijado debería estar PROHIBIDO',
+    ).rejects.toThrow();
+    expect(
+      (await getDoc(ref)).data()!.initialWeight,
+      'El peso de partida no debería haber cambiado',
+    ).toBe(82.4);
+  } finally {
+    // La limpieza, con la sesión todavía abierta (sin sesión, las reglas deniegan
+    // la lectura y daría un error de permisos que no tiene nada que ver).
+    try {
+      await deleteDoc(ref);
+    } catch {
+      /* ya no estaba */
+    }
+  }
+
+  expect(
+    (await getDoc(ref)).exists(),
+    'El perfil de prueba debería haber quedado borrado',
+  ).toBe(false);
+
+  await deleteUser(cred.user);
+  expect(auth.currentUser, 'La cuenta de miembro de prueba no debería quedar abierta').toBeNull();
 });

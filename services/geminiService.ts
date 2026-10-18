@@ -1,6 +1,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { User, PublicProfile } from "../types";
+import { sinPesoDePartida } from "./pesoDePartida";
 
 /**
  * Cliente de Gemini PEREZOSO y tolerante a fallos.
@@ -66,6 +67,13 @@ const replacePlaceholders = (text: string, user: User) => {
 };
 
 export const getMotivationalMessage = async (user: User, leaderboard: PublicProfile[]) => {
+  // Quien viene de EMPEZAR DE CERO no tiene peso de partida, y puede no tener ni un
+  // pesaje. Los textos de siempre hablan de su peso («Empezamos con {weight}kg»),
+  // así que ahí sonarían a error: se le da uno propio.
+  if (sinPesoDePartida(user)) {
+    return '¡Arrancamos de nuevo! Tu primer pesaje de este periodo marca tu punto de partida. 💪';
+  }
+
   const position = leaderboard.findIndex(u => u.id === user.id) + 1;
   const lastChange = user.history.length > 0 ? user.history[user.history.length - 1].delta : 0;
   

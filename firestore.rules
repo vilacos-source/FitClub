@@ -42,11 +42,15 @@ service cloud.firestore {
     // --- Validaciones ---
 
     // Datos públicos: NUNCA pueden contener información personal.
+    // `initialWeight` admite CERO: significa «sin peso de partida todavía», que es
+    // como queda quien empieza un periodo nuevo. Su primer pesaje lo fija. Antes
+    // exigía ser mayor que cero, y con eso no se podía ni borrar el peso de partida
+    // ni dejar a nadie «sin empezar».
     function isValidPublic(data) {
       return data.keys().hasAll(['pseudonym', 'avatar', 'initialWeight', 'totalPoints', 'totalWeightLoss', 'isAdmin']) &&
              data.pseudonym is string && data.pseudonym.size() > 0 && data.pseudonym.size() <= 50 &&
              data.avatar is string && data.avatar.size() <= 500 &&
-             data.initialWeight is number && data.initialWeight > 0 &&
+             data.initialWeight is number && data.initialWeight >= 0 &&
              data.totalPoints is number && data.totalPoints >= 0 &&
              data.totalWeightLoss is number &&
              data.isAdmin is bool;
@@ -78,12 +82,24 @@ service cloud.firestore {
                       ((isOwner(userId) && incoming().isAdmin == false) || isAdmin());
 
       // Modificación: un admin puede todo; el dueño solo sus propios datos y
-      // no puede tocarse el rol (evita el auto-ascenso a admin).
+      // no puede tocarse el rol (evita el auto-ascenso a admin). Además puede
+      // FIJAR SU PESO DE PARTIDA, pero solo mientras esté pendiente (ver abajo).
       allow update: if isValidPublic(incoming()) && (
                       isAdmin() ||
                       (isOwner(userId) &&
                        incoming().isAdmin == existing().isAdmin &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['totalPoints', 'totalWeightLoss', 'pseudonym', 'avatar']))
+                       (
+                         // Lo de siempre: sus totales.
+                         incoming().diff(existing()).affectedKeys().hasOnly(['totalPoints', 'totalWeightLoss', 'pseudonym', 'avatar']) ||
+                         // El caso del periodo nuevo: su PRIMER PESAJE fija el peso
+                         // de partida. Se permite SOLO mientras esté pendiente (a
+                         // cero), que es como lo deja «empezar de cero». Sin esta
+                         // condición, cualquiera podría reescribir su peso de salida
+                         // el día que le conviniera y los kilos perdidos no
+                         // significarían nada.
+                         (existing().initialWeight == 0 &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['totalPoints', 'totalWeightLoss', 'initialWeight']))
+                       ))
                     );
 
       // El dueño puede borrarse a sí mismo (derecho de supresión y, de paso,
