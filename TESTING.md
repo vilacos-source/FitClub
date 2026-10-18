@@ -426,8 +426,6 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
-<<<<<<< Updated upstream
-=======
 ### El texto de la invitación por WhatsApp ✅ aplicado
 - **Antes** el mensaje se montaba solo con las fechas, el premio y «El reto acaba
   el…». Elena lo quiso más directo, y ahora es un texto fijo de dos líneas.
@@ -479,7 +477,6 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
->>>>>>> Stashed changes
 ### Probar los cambios antes de publicarlos: la vista previa ✅ aplicado
 - **El problema:** cada push a `main` salía directo a la URL que usa el grupo, así
   que un cambio roto lo veían ellos antes que Elena.
@@ -528,8 +525,17 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   al principio del flujo que lo comprueba y lo explica si alguien lo cambia.
 - **Cómo se usa:** se deja el cambio en una rama (la de vista previa), se **lanza el
   flujo desde `main`** indicando qué rama previsualizar (campo `vista`), aparece en
-  `/preview/`, Elena lo mira en el móvil, y se pasa a `main`. Lanzarlo con `vista`
-  vacío **retira** la vista previa.
+  `/preview/`, Elena lo mira en el móvil, y se pasa a `main`.
+- **La vista previa ya no se cae sola.** Antes, publicar la app desde `main` la
+  retiraba (lanzar con `vista` vacío = retirar), así que **cada publicación la
+  borraba** y había que volver a publicarla a mano — le pasaba al asistente en cada
+  cambio. Ahora hay una **variable del repositorio** (`VISTA_PREVIA`) que dice qué
+  rama previsualizar por defecto: publicar desde `main` **la mantiene**, y las
+  publicaciones llevan las dos cosas. Para retirarla, se lanza con `vista: ninguna`
+  (o se borra la variable). El campo `vista` sigue mandando cuando se rellena.
+- El flujo define la dirección **una sola vez** para las tres comprobaciones (la
+  espera, la batería y el vigilante): así no pueden discrepar entre ellas y mirar
+  unas a la vista previa y otras a la web real.
 - **La CI prueba la vista previa, no la app real**, cuando es ella la que se
   publica: eso es lo que hay que verificar antes de que lo vea nadie.
 - **Comprobado de punta a punta en la web real** con un cambio de prueba: aparecía
@@ -556,7 +562,9 @@ verdad: S8 falló dos veces seguidas tras publicar y **pasó al relanzar el mism
 trabajo sin tocar una línea** — no era una avería. Por eso el flujo **espera a que la
 web sirva su bundle** antes de lanzar la batería. Un falso rojo es peor que no tener
 pruebas, porque enseña a ignorar el rojo. Si vuelve a pasar: **relanza antes de
-investigar**, y solo si falla otra vez mira el código.
+investigar**, y solo si falla otra vez mira el código. (Ha vuelto a pasar después, y
+esta vez lo absorbió el **reintento que la CI ya trae configurado** — por eso la
+batería salió verde contando «1 inestable» en lugar de un rojo.)
 
 | Test | Qué verifica | Estado |
 |------|--------------|--------|
@@ -590,15 +598,12 @@ investigar**, y solo si falla otra vez mira el código.
 | V4 | Sin `<body>` falla en vez de servir una vista previa sin marcar | ✅ |
 | V5 | En el navegador el aviso se ve de verdad, arriba y a lo ancho | ✅ |
 | V6 | La versión real NO lleva la marca | ✅ |
-<<<<<<< Updated upstream
-=======
 | W1 | El texto de la invitación publicado es exactamente el aprobado | ✅ |
 | W2 | La invitación sigue llevando el enlace al final | ✅ |
 | X1 | El manifiesto publicado es válido y sus iconos descargan | ✅ |
 | X2 | El HTML trae lo que evita la barra del navegador (iPhone) | ✅ |
 | X3 | Está el fichero que Android exige para instalar con su icono | ✅ |
 | X4 | La app de la vista previa se llama distinto (dos iconos, dos nombres) | ✅ |
->>>>>>> Stashed changes
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada
