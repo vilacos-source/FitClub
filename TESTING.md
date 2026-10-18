@@ -527,7 +527,9 @@ verdad: S8 falló dos veces seguidas tras publicar y **pasó al relanzar el mism
 trabajo sin tocar una línea** — no era una avería. Por eso el flujo **espera a que la
 web sirva su bundle** antes de lanzar la batería. Un falso rojo es peor que no tener
 pruebas, porque enseña a ignorar el rojo. Si vuelve a pasar: **relanza antes de
-investigar**, y solo si falla otra vez mira el código.
+investigar**, y solo si falla otra vez mira el código. (Ha vuelto a pasar después, y
+esta vez lo absorbió el **reintento que la CI ya trae configurado** — por eso la
+batería salió verde contando «1 inestable» en lugar de un rojo.)
 
 | Test | Qué verifica | Estado |
 |------|--------------|--------|
