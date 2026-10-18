@@ -524,10 +524,18 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 - **R4 y R5 se saltan solas** salvo que se pida (`PROBAR_REINICIO=si`): crean sus
   propias cuentas de prueba, las usan y **lo borran todo** al terminar. No tocan a
   nadie del grupo y no se ejecutan en cada publicación.
-- **Trampa que costó un falso culpable:** la primera versión comprobaba la limpieza
-  **después** de cerrar la sesión de prueba, y las lecturas sin sesión las deniegan
-  las reglas → salía un error de permisos que **parecía del reinicio** y no lo era.
-  La limpieza se comprueba con la sesión aún abierta; la cuenta se cierra al final.
+- **Dos trampas de las pruebas contra la base de datos de verdad, y las dos del mismo
+  sitio: la limpieza.**
+  - La comprobación de que se había borrado iba **después** de cerrar la sesión de
+    prueba, y las lecturas sin sesión las deniegan las reglas → salía un error de
+    permisos que **parecía del reinicio** y no lo era.
+  - Y la cuenta de acceso se borraba **después** de esa comprobación, así que
+    cualquier fallo anterior dejaba la cuenta **viva**. Con el email de
+    administradora eso es serio (el email ES el rol) y, de propina, **estorba a la
+    siguiente ejecución**: no se puede volver a crear y no se conoce su contraseña,
+    así que hay que borrarla a mano en la consola.
+  La regla que queda: **lo que hay que borrar siempre va en el `finally`; las
+  comprobaciones de que se borró, justo antes**, con la sesión todavía abierta.
 
 ---
 

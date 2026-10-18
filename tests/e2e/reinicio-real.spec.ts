@@ -72,10 +72,19 @@ test('R4 - un administrador puede de verdad poner a cero a un participante', asy
     try {
       await createUserWithEmailAndPassword(auth, EMAIL_ADMIN_PRUEBA, clave);
     } catch {
-      // Si quedó de una vez anterior, se entra con la misma contraseña (la de
-      // esta ejecución se acaba de generar, así que si falla es que la cuenta es
-      // de otra ejecución: mejor parar y decirlo que seguir a ciegas).
-      await signInWithEmailAndPassword(auth, EMAIL_ADMIN_PRUEBA, clave);
+      // Si la cuenta ya existe es que quedó de una ejecución anterior que no llegó
+      // a borrarla. Se prueba a entrar con la contraseña de ESTA ejecución (no
+      // puede coincidir), y si falla se para diciendo qué hay que hacer: no se
+      // puede borrar desde aquí, porque hace falta la contraseña vieja.
+      try {
+        await signInWithEmailAndPassword(auth, EMAIL_ADMIN_PRUEBA, clave);
+      } catch {
+        throw new Error(
+          `La cuenta de prueba ${EMAIL_ADMIN_PRUEBA} ya existe y no es de esta ejecución: ` +
+            'quedó sin borrar de una vez anterior. Hay que borrarla a mano en ' +
+            'Firebase → Authentication → Users (el email ES el rol, así que no debe quedar viva).',
+        );
+      }
     }
     expect(auth.currentUser?.email, 'Deberíamos estar dentro como administradora').toBe(
       EMAIL_ADMIN_PRUEBA,
@@ -127,8 +136,29 @@ test('R4 - un administrador puede de verdad poner a cero a un participante', asy
     );
     expect(pub.data()!.isAdmin, 'No debería cambiarlo de rol').toBe(false);
     expect(priv.data()!.realName, 'No debería borrarle el nombre real').toBe('Persona de prueba');
+
+    // 5. Se borra lo de prueba y se comprueba AQUÍ, con la sesión todavía abierta:
+    //    sin sesión, las reglas deniegan la lectura y daría un error de permisos
+    //    que parecería del reinicio y no lo sería.
+    for (const d of [docs.publico, docs.privado]) await deleteDoc(d);
+    const [pubTrasBorrar, privTrasBorrar] = await Promise.all([
+      getDoc(docs.publico),
+      getDoc(docs.privado),
+    ]);
+    expect(
+      pubTrasBorrar.exists(),
+      'El participante de prueba debería haber quedado borrado',
+    ).toBe(false);
+    expect(
+      privTrasBorrar.exists(),
+      'Los datos privados de prueba deberían haber quedado borrados',
+    ).toBe(false);
   } finally {
-    // 5. Limpieza, pase lo que pase: los dos documentos de prueba.
+    // 6. Limpieza que tiene que pasar SIEMPRE, también si algo de arriba falla: los
+    //    dos documentos y la cuenta de acceso. Va en el `finally` y no después,
+    //    porque un fallo antes deja la cuenta viva — y una cuenta de prueba viva
+    //    estorba a la siguiente ejecución (no se puede crear otra vez ni se conoce
+    //    su contraseña).
     for (const d of [docs.publico, docs.privado]) {
       try {
         await deleteDoc(d);
@@ -136,23 +166,12 @@ test('R4 - un administrador puede de verdad poner a cero a un participante', asy
         /* ya no estaba */
       }
     }
+    try {
+      if (auth.currentUser) await deleteUser(auth.currentUser);
+    } catch {
+      /* ya no estaba */
+    }
   }
-
-  // 5b. La limpieza se comprueba AHORA, leyendo después de borrar y TODAVÍA con
-  // la sesión de administradora abierta. El orden importa: si se cerrara la
-  // sesión antes de comprobar, estas lecturas irían sin identificar y las
-  // reglas las denegarían, dando un error de permisos que parece del reinicio y
-  // no lo es.
-  const [pub, priv] = await Promise.all([getDoc(docs.publico), getDoc(docs.privado)]);
-  expect(pub.exists(), 'El participante de prueba debería haber quedado borrado').toBe(false);
-  expect(priv.exists(), 'Los datos privados de prueba deberían haber quedado borrados').toBe(false);
-
-  // 6. Y ya sí, se cierra la cuenta de acceso de prueba.
-  if (auth.currentUser) await deleteUser(auth.currentUser);
-  expect(
-    auth.currentUser,
-    'La cuenta de administradora de prueba no debería quedar abierta',
-  ).toBeNull();
 });
 
 test('R5 - el primer pesaje fija el peso de partida, y después ya no se puede cambiar', async () => {
@@ -166,16 +185,12 @@ test('R5 - el primer pesaje fija el peso de partida, y después ya no se puede c
   const db = getFirestore(app, config.firestoreDatabaseId);
 
   const clave = randomBytes(18).toString('base64url');
-  const EMAIL_MIEMBRO = 'vilacos+prueba-miembro@gmail.com';
+  // Dirección distinta en cada ejecución: así no puede chocar con la de una vez
+  // anterior. (No hace falta que sea el correo de Elena: esta cuenta NO es
+  // administradora, o sea que el email no le da ningún poder. Se borra al final.)
+  const emailMiembro = `prueba-miembro-${randomBytes(5).toString('hex')}@example.com`;
 
-  // Se usa una cuenta de MIEMBRO normal (esa dirección no es admin), que es justo
-  // la que tiene que poder fijar su peso de partida con su primer pesaje.
-  let cred;
-  try {
-    cred = await createUserWithEmailAndPassword(auth, EMAIL_MIEMBRO, clave);
-  } catch {
-    cred = await signInWithEmailAndPassword(auth, EMAIL_MIEMBRO, clave);
-  }
+  const cred = await createUserWithEmailAndPassword(auth, emailMiembro, clave);
   const ref = doc(db, 'leaderboard', cred.user.uid);
 
   try {
@@ -215,21 +230,28 @@ test('R5 - el primer pesaje fija el peso de partida, y después ya no se puede c
       (await getDoc(ref)).data()!.initialWeight,
       'El peso de partida no debería haber cambiado',
     ).toBe(82.4);
+
+    // 4. Se borra lo de prueba y se comprueba AQUÍ, con la sesión todavía abierta
+    //    (sin sesión, las reglas deniegan la lectura y daría un error de permisos
+    //    que no tiene nada que ver).
+    await deleteDoc(ref);
+    expect(
+      (await getDoc(ref)).exists(),
+      'El perfil de prueba debería haber quedado borrado',
+    ).toBe(false);
   } finally {
-    // La limpieza, con la sesión todavía abierta (sin sesión, las reglas deniegan
-    // la lectura y daría un error de permisos que no tiene nada que ver).
+    // La limpieza que tiene que pasar SIEMPRE, también si algo falla: el documento
+    // y la cuenta de acceso. En el `finally` y no después, porque un fallo antes
+    // dejaría la cuenta viva.
     try {
       await deleteDoc(ref);
     } catch {
       /* ya no estaba */
     }
+    try {
+      if (auth.currentUser) await deleteUser(auth.currentUser);
+    } catch {
+      /* ya no estaba */
+    }
   }
-
-  expect(
-    (await getDoc(ref)).exists(),
-    'El perfil de prueba debería haber quedado borrado',
-  ).toBe(false);
-
-  await deleteUser(cred.user);
-  expect(auth.currentUser, 'La cuenta de miembro de prueba no debería quedar abierta').toBeNull();
 });
