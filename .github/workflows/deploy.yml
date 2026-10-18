@@ -1,12 +1,20 @@
 name: Deploy to GitHub Pages
 
-# Se dispara al publicar la app real (`main`) y también al actualizar la vista
-# previa (`preview`). En los dos casos se construye la app real desde `main`; lo
-# único que cambia es si además se añade la vista previa.
+# La publicación SIEMPRE sale de `main`. No es una preferencia: **GitHub Pages
+# rechaza la publicación si el flujo no se origina en la rama principal** —
+# comprobado a base de intentos: los lanzados desde la rama de vista previa fallaban
+# una y otra vez, y el mismo trabajo lanzado desde `main` funcionaba. Así que la
+# vista previa NO se publica empujando a su rama: se publica lanzando esto a mano
+# desde `main` y diciendo QUÉ rama previsualizar (`vista`).
 on:
   push:
-    branches: [main, preview]
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      vista:
+        description: 'Rama o commit a publicar como vista previa en /preview/ (vacío = se retira la vista previa)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -21,6 +29,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Red de seguridad: si alguien vuelve a poner un disparador desde otra rama,
+      # esto lo para con una explicación, en vez de dejar un fallo de publicación
+      # difícil de entender (que es exactamente lo que ha pasado al construir esto).
+      - name: La publicación tiene que salir de main
+        run: |
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            echo "Este flujo se ha lanzado desde «${{ github.ref_name }}»."
+            echo "GitHub Pages RECHAZA la publicación si no sale de la rama principal:"
+            echo "desde otra rama, la compilación pasa y el despliegue falla."
+            echo "Para publicar una vista previa, lánzalo desde main con el campo 'vista'."
+            exit 1
+          fi
       # La app REAL se compila SIEMPRE desde `main`, sea cual sea la rama que haya
       # disparado esto. Sin este `ref`, un push a la vista previa compilaría la
       # vista previa y la publicaría en la URL que usa el grupo: exactamente lo
@@ -38,20 +58,21 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VITE_BASE_PATH: /FitClub/
 
-      - name: ¿Hay rama de vista previa?
+      - name: ¿Hay que publicar una vista previa?
         id: vista
         run: |
-          if git ls-remote --exit-code --heads origin preview > /dev/null 2>&1; then
+          if [ -n "${{ inputs.vista }}" ]; then
             echo "hay=si" >> "$GITHUB_OUTPUT"
+            echo "Vista previa de: ${{ inputs.vista }}"
           else
             echo "hay=no" >> "$GITHUB_OUTPUT"
-            echo "No hay rama 'preview': se publica solo la app real."
+            echo "Sin vista previa: se publica solo la app real."
           fi
 
       - uses: actions/checkout@v4
         if: steps.vista.outputs.hay == 'si'
         with:
-          ref: preview
+          ref: ${{ inputs.vista }}
           path: _vista
 
       # GitHub Pages publica UN sitio por repositorio (cada despliegue reemplaza el
@@ -128,20 +149,40 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Esperar a que la web sirva el despliegue nuevo
+        # GitHub Pages tarda un poco en servir los ficheros nuevos después de
+        # publicar. Las pruebas que RECARGAN la app (S8) pueden coger el cambio a
+        # medias y dar un fallo falso: el navegador pide un bundle que acaba de
+        # desaparecer y la pantalla queda en blanco (el mecanismo del INC-012).
+        # Un falso rojo es peor que no tener pruebas, porque enseña a ignorarlas.
+        run: |
+          BASE="${{ inputs.vista != '' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}"
+          for intento in $(seq 1 10); do
+            HTML=$(curl -s --max-time 20 "$BASE")
+            JS=$(echo "$HTML" | grep -o 'assets/index-[A-Za-z0-9_-]*\.js' | head -1)
+            if [ -n "$JS" ] && curl -sf -o /dev/null --max-time 20 "$BASE$JS"; then
+              echo "La web ya sirve su bundle ($JS)."
+              exit 0
+            fi
+            echo "Intento $intento: el despliegue aún no está servido del todo; espero 8s."
+            sleep 8
+          done
+          echo "La web no termina de servir su bundle: las pruebas darían falsos fallos."
+          exit 1
       - name: Batería de smoke tests contra el despliegue
         # Si lo que se acaba de publicar es la VISTA PREVIA, las pruebas van contra
         # ella: eso es lo que hay que comprobar antes de que lo vea nadie. Si no,
         # contra la web real.
         run: npx playwright test --reporter=list
         env:
-          BASE_URL: ${{ github.ref_name == 'preview' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
+          BASE_URL: ${{ inputs.vista != '' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
       - name: Vigilante de la web publicada (sitio y reglas)
         # Comprueba que la web está en pie, que los ficheros publicados son del
         # MISMO despliegue (caza el INC-013) y que las reglas siguen cerradas
         # (esto último no lo mira la batería de navegador).
         run: node scripts/health-check.mjs
         env:
-          BASE_URL: ${{ github.ref_name == 'preview' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
+          BASE_URL: ${{ inputs.vista != '' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
       - name: Publicar informe de resultados
         if: always()
         uses: actions/upload-artifact@v4

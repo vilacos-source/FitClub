@@ -391,6 +391,41 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### Cuenta de prueba para comprobar la pantalla de administrador ✅ aplicado
+- La pantalla de admin (la tarjeta de invitar, el alta con email y la copia de
+  seguridad) **no se puede comprobar sin una cuenta con permisos**. El test S13 se
+  salta sin credenciales, para no poner la CI en rojo por una pantalla que no puede
+  alcanzar.
+- Se añadió **`vilacos+prueba@gmail.com`** a las DOS listas (app y reglas). Es una
+  variante del correo de Elena, así que **solo ella puede reclamarla**: nadie más
+  podría registrarla para hacerse administrador. Con un correo inventado de
+  cualquier dominio, cualquiera que lo conociera podría: el email es el rol.
+- La contraseña de esa cuenta **la genera el asistente y no pasa por el chat**, y la
+  cuenta **se borra al terminar la comprobación**, así que no deja rastro en el
+  ranking.
+- **Comprobado a mano el 15/10/2026, con esa cuenta desechable.** Resultado:
+  - El panel abre y **el alta se permite de verdad** — eso demuestra que las reglas
+    publicadas y el `ADMIN_EMAILS` desplegado coinciden (si no, el alta daría
+    «permisos insuficientes», sin más aviso).
+  - La tarjeta de invitar muestra el enlace a la vista; el botón de WhatsApp
+    construye el mensaje con **las fechas y el premio reales** («10/10/2026 –
+    9/11/2026», «Una copita de vino»); el formulario de alta pide el email con el
+    aviso correspondiente.
+  - **La copia de seguridad se descargó y se abrió**: 7 participantes, 7 personas,
+    4 pesajes, 7 nombres reales, configuración del reto incluida, y el resumen
+    cuadrando con el contenido. Los números cuadran con lo que ve la app (Mona 3
+    pesajes y 5,7 kg; Pepita 1 y −3 kg; el resto sin pesarse).
+  - **Borrada después y comprobado**: los dos documentos ya no están (leído después
+    de borrar) y la cuenta de acceso ya no deja entrar. No queda nada en el ranking.
+- **Un límite encontrado al verificar:** listar una colección por la API de Firestore
+  con la sesión devuelve **403**, aunque la app sí puede listar (es como se descargó
+  la copia). Es una restricción de la clave, no de los datos ni de las reglas. Se
+  verificó comparando la copia con lo que muestra la propia app.
+- Si algún día se quiere quitar, hay que borrarla **de las dos listas** y republicar
+  las reglas; si se quita de una sola, el test C1 falla — con razón.
+
+---
+
 ### Probar los cambios antes de publicarlos: la vista previa ✅ aplicado
 - **El problema:** cada push a `main` salía directo a la URL que usa el grupo, así
   que un cambio roto lo veían ellos antes que Elena.
@@ -430,11 +465,23 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   hace es que el grupo no se la encuentre: la URL que ellos usan no cambia.
 - **La vista previa lee los datos REALES** (misma base de datos), así que sirve para
   ver cómo queda, no para probar cosas que borren o cambien datos de verdad.
-- **Cómo se usa:** se empuja el cambio a la rama `preview` → aparece en
-  `/preview/` → Elena lo mira en el móvil → se pasa a `main`. Borrar la rama
-  `preview` retira la vista previa en el siguiente despliegue.
-- Con la rama `preview` sin existir, **todo esto queda inerte**: se publica solo la
-  app real, como antes.
+- **HALLAZGO IMPORTANTE: GitHub Pages rechaza la publicación si el flujo no sale de
+  la rama principal.** No está claro en su documentación. Se descubrió a base de
+  intentos: con un disparador por push a la rama de vista previa, **la compilación
+  pasaba y el despliegue fallaba una y otra vez** (`Timeout reached` el primero,
+  `Deployment cancelled` después); el mismo trabajo lanzado desde `main` funcionaba
+  a la primera. Por eso **la publicación sale siempre de `main`**, y hay una guarda
+  al principio del flujo que lo comprueba y lo explica si alguien lo cambia.
+- **Cómo se usa:** se deja el cambio en una rama (la de vista previa), se **lanza el
+  flujo desde `main`** indicando qué rama previsualizar (campo `vista`), aparece en
+  `/preview/`, Elena lo mira en el móvil, y se pasa a `main`. Lanzarlo con `vista`
+  vacío **retira** la vista previa.
+- **La CI prueba la vista previa, no la app real**, cuando es ella la que se
+  publica: eso es lo que hay que verificar antes de que lo vea nadie.
+- **Comprobado de punta a punta en la web real** con un cambio de prueba: aparecía
+  en el bundle de `/FitClub/preview/` y **no** en el de `/FitClub/`.
+- Lanzar el flujo **sin indicar rama** deja todo inerte: se publica solo la app
+  real, como antes.
 
 ---
 
@@ -447,6 +494,15 @@ después de publicar) contra la web real. También en local:
 npm run test:smoke          # contra la web publicada
 npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview)
 ```
+
+**Ojo con un rojo de S8 justo después de un despliegue.** S8 recarga la app, y GitHub
+Pages tarda un poco en servir los ficheros nuevos: el navegador puede pedir un bundle
+que acaba de desaparecer y quedarse en blanco (el mecanismo del **INC-012**). Pasó de
+verdad: S8 falló dos veces seguidas tras publicar y **pasó al relanzar el mismo
+trabajo sin tocar una línea** — no era una avería. Por eso el flujo **espera a que la
+web sirva su bundle** antes de lanzar la batería. Un falso rojo es peor que no tener
+pruebas, porque enseña a ignorar el rojo. Si vuelve a pasar: **relanza antes de
+investigar**, y solo si falla otra vez mira el código.
 
 | Test | Qué verifica | Estado |
 |------|--------------|--------|
@@ -463,7 +519,7 @@ npm run test:smoke:local    # contra http://localhost:4173 (tras npm run preview
 | S7e | Nadie puede auto-ascenderse a administrador | ✅ |
 | S7f | Un usuario normal no puede escribir la configuración del reto | ✅ |
 | S7g | Cada usuario puede borrar sus propios datos | ✅ |
-| S13 | El panel de admin: enlace, formulario con email y copia de seguridad | ⏭️ se salta sin credenciales de admin |
+| S13 | El panel de admin: enlace, formulario con email y copia de seguridad | ⏭️ se salta sin credenciales de admin (verificado a mano el 15/10/2026) |
 | B1 | La copia no pierde nada: todo lo que entra sale igual | ✅ |
 | B2 | El resumen de la copia cuadra con lo que hay dentro | ✅ |
 | B3 | Caso grande (10×31): no se cae ningún pesaje por el camino | ✅ |
