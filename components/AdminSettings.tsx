@@ -59,11 +59,14 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
   // Enlace de la app. Se calcula en vivo para que funcione tanto en la web
   // publicada como en una prueba local, sin que haya que tocar nada.
   const enlaceApp = `${window.location.origin}${window.location.pathname}`;
-  const nombreReto = `Reto FitClub · ${new Date(config.startDate).toLocaleDateString('es-ES')} – ${new Date(config.endDate).toLocaleDateString('es-ES')}`;
+  // Texto de la invitación, tal cual lo aprobó Elena. Los datos del reto (fechas,
+  // premio) ya se ven dentro de la app, así que el mensaje va directo al grano.
+  // Se le añade el enlace al final, que es por donde se registran.
+  // Lo vigila el test W1 (tests/e2e/invitacion.spec.ts): si se cambia aquí, hay
+  // que actualizarlo allí a propósito — que falle es el objetivo.
   const textoWhatsApp =
-    `¡Te invito al ${nombreReto}! 🏆\n` +
-    `Entra aquí, coge tu pseudónimo y a por el premio: ${config.prizeDescription}\n` +
-    `El reto acaba el ${new Date(config.endDate).toLocaleDateString('es-ES')}.\n\n` +
+    `¡Te invito al Reto FitClub! 🏆\n\n` +
+    `Regístrate y a por todas. Tu esfuerzo tiene premio.\n\n` +
     `${enlaceApp}`;
 
   const copiarTexto = async (texto: string) => {
