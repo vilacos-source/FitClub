@@ -445,7 +445,7 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 ### La app instalable: icono en el móvil y sin barra del navegador ✅ aplicado
 - **Lo que se quería:** poder poner el icono en la pantalla de inicio y que al
   abrirlo **no salga la barra del navegador**. Sin tiendas, sin cuotas y sin pasar
-  revisiones.
+  revisiones. **Comprobado por Elena en su móvil**: icono puesto y abre sin barra.
 - **Cada sistema pide cosas distintas**, y esto es lo que se descubrió:
   - **Android** NO deja instalar la app con su icono propio si no encuentra un
     fichero `sw.js`. Sin él crea un simple marcador: icono genérico **y además con
@@ -541,6 +541,18 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
   unas a la vista previa y otras a la web real.
 - **La CI prueba la vista previa, no la app real**, cuando es ella la que se
   publica: eso es lo que hay que verificar antes de que lo vea nadie.
+- **Las pruebas salen de la MISMA rama que se publica como vista previa** (de `main`
+  cuando se publica la app real). Antes salían siempre de `main`, y tenía un
+  agujero: un test nuevo escrito en la rama de vista previa **no se ejecutaba** hasta
+  publicarlo — se descubrió con los tests de la app instalable, que hubo que pasar a
+  mano para saber si valían.
+- **Cuidado con `working-directory: _vista`**: cada trabajo de la CI se descarga el
+  repositorio por su cuenta, y la carpeta `_vista` **solo existe en el trabajo que
+  compila** (es la que recibe la rama en pruebas). Poner esa carpeta como directorio
+  de trabajo en el trabajo de pruebas hace que el paso **ni arranque** («No such file
+  or directory») y tumba una publicación normal. Lo que funciona es que el trabajo de
+  pruebas se traiga **la rama**, no la carpeta. Costó tres intentos descubrirlo:
+  el mensaje de error no mencionaba ni la carpeta ni el motivo real.
 - **Comprobado de punta a punta en la web real** con un cambio de prueba: aparecía
   en el bundle de `/FitClub/preview/` y **no** en el de `/FitClub/`.
 - Lanzar el flujo **sin indicar rama** deja todo inerte: se publica solo la app
