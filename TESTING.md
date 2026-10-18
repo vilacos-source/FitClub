@@ -480,7 +480,10 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
-### Empezar de cero con un participante al cambiar de periodo 🟡 en la vista previa
+### Empezar de cero con un participante al cambiar de periodo ✅ aplicado
+- **Comprobado por Elena en la app de verdad**: probó el reinicio en la vista previa
+  (que usa los mismos datos) y se lo dio a Mona y a Divina para empezar el periodo
+  nuevo. Además, R4/R5 lo verifican contra la base de datos sin intervención.
 - **El problema que lo destapó:** al cambiar las fechas del reto para un periodo
   nuevo, los pesajes del anterior **seguían ahí**. No es un dato a medias ni un
   fallo de esa pantalla: los pesajes **no van etiquetados con el periodo** al que
