@@ -31,7 +31,7 @@ const SENAL = 'id="aviso-vista-previa"';
 const ALTO = 30;
 
 /** Nombre con el que se guarda la app instalada desde la vista previa. */
-export const NOMBRE_VISTA = 'FitClub (prueba)';
+export const NOMBRE_VISTA = 'FitClub Test';
 
 const AVISO = `
     <!-- Aviso de vista previa: añadido por scripts/marcar-vista-previa.mjs -->

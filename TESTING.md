@@ -465,10 +465,13 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 - **El manifiesto usa rutas relativas** (`start_url: "./"`), así que el MISMO
   fichero vale para la web real y para la vista previa, un piso más abajo. Si se
   cambiara a `"/"`, la app instalada abriría en la raíz del dominio.
-- **La app instalada desde la vista previa se llama «FitClub (prueba)»**, y no es un
-  capricho: el móvil guarda el nombre y el icono **al instalar** y no los actualiza,
-  así que con dos nombres iguales quedarían dos iconos idénticos sin saber cuál es
-  cuál.
+- **La app instalada desde la vista previa se llama «FitClub Test»** y la de verdad
+  «FitClub»: así las dos conviven en el móvil y se distinguen de un vistazo. Y no es
+  un capricho: el móvil guarda el nombre y el icono **al instalar** y no los
+  actualiza, así que sin nombres distintos quedarían **dos iconos idénticos** sin
+  saber cuál es cuál. Ojo al cambiar el nombre en el manifiesto de algo ya
+  instalado: el móvil **no lo renombra solo**; hay que quitar el icono viejo y
+  volver a añadirlo.
 - **Cubierto por X1–X4.** Son fallos **silenciosos** (un icono mal escrito no da
   ningún error: simplemente no aparece), así que los tests descargan el manifiesto,
   **cada icono** y el `sw.js`, y exigen que respondan. Comprobado por A/B antes de
