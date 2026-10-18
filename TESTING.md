@@ -426,6 +426,22 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### El texto de la invitación por WhatsApp ✅ aplicado
+- **Antes** el mensaje se montaba solo con las fechas, el premio y «El reto acaba
+  el…». Elena lo quiso más directo, y ahora es un texto fijo de dos líneas.
+- **El enlace se mantiene al final**, y no es un detalle: es por donde se registran
+  y es lo que copia el botón *Copiar*. Una invitación sin enlace no sirve.
+- `tests/e2e/invitacion.spec.ts`: **W1 ancla el texto exacto aprobado** y **W2
+  comprueba que el enlace de WhatsApp y el de la app siguen ahí**. Si algún día
+  cambia la redacción, W1 falla y hay que actualizarlo a propósito — **que falle es
+  el objetivo**: así cambiar el mensaje es una decisión, no un descuido.
+- Los dos descargan el fichero publicado y **exigen que no venga vacío**: si
+  viniera vacío, las comprobaciones de dentro darían un verde que no significa nada.
+- Comprobado **por A/B antes de publicar**: contra la web que aún tenía el texto
+  viejo, W1 se puso en rojo diciendo exactamente qué línea faltaba.
+
+---
+
 ### Probar los cambios antes de publicarlos: la vista previa ✅ aplicado
 - **El problema:** cada push a `main` salía directo a la URL que usa el grupo, así
   que un cambio roto lo veían ellos antes que Elena.
@@ -536,6 +552,8 @@ investigar**, y solo si falla otra vez mira el código.
 | V4 | Sin `<body>` falla en vez de servir una vista previa sin marcar | ✅ |
 | V5 | En el navegador el aviso se ve de verdad, arriba y a lo ancho | ✅ |
 | V6 | La versión real NO lleva la marca | ✅ |
+| W1 | El texto de la invitación publicado es exactamente el aprobado | ✅ |
+| W2 | La invitación sigue llevando el enlace al final | ✅ |
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada
