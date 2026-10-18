@@ -64,7 +64,7 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
   // grano. Se le añade el enlace al final, que es por donde se registran.
   const textoWhatsApp =
     `¡Te invito al Reto FitClub! 🏆\n\n` +
-    `Regístrate y a por todas.Tu esfuerzo tiene premio.\n\n` +
+    `Regístrate y a por todas. Tu esfuerzo tiene premio.\n\n` +
     `${enlaceApp}`;
 
   const copiarTexto = async (texto: string) => {
