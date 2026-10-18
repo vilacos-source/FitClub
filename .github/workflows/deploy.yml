@@ -31,11 +31,7 @@ jobs:
     outputs:
       # Lo usan las pruebas y el vigilante para saber contra qué URL mirar.
       hay_vista: ${{ steps.vista.outputs.hay }}
-      # Y de dónde sacarlas. La vista previa se compila aparte (en `_vista`), así que
-      # sus pruebas tienen que salir de ESA carpeta, no de la copia de `main`. Se
-      # calcula aquí, donde la carpeta sí existe: en el trabajo de pruebas `_vista`
-      # no está, y ponerlo allí rompía las publicaciones normales.
-      carpeta: ${{ steps.vista.outputs.carpeta }}
+      rama: ${{ steps.vista.outputs.rama }}
     steps:
       # Red de seguridad: si alguien vuelve a poner un disparador desde otra rama,
       # esto lo para con una explicación, en vez de dejar un fallo de publicación
@@ -80,22 +76,10 @@ jobs:
           if [ -n "$rama" ]; then
             echo "hay=si" >> "$GITHUB_OUTPUT"
             echo "rama=$rama" >> "$GITHUB_OUTPUT"
-            echo "carpeta=_vista" >> "$GITHUB_OUTPUT"
             echo "Vista previa de: $rama"
           else
             echo "hay=no" >> "$GITHUB_OUTPUT"
-            echo "carpeta=." >> "$GITHUB_OUTPUT"
             echo "Sin vista previa: se publica solo la app real."
-          fi
-
-          # Comprobación explícita: en la vista previa las pruebas tienen que salir de
-          # la carpeta que se acaba de compilar. Si no, se pasarían contra una copia
-          # distinta de main y podrían dar VERDE probando algo que no es lo publicado.
-          # (Pasó con los tests de la app instalable: no existían en main y el flujo
-          # se paró con un error raro de carpeta en vez de decir qué faltaba.)
-          if [ "$(cat "$GITHUB_OUTPUT" | grep -c '^carpeta=')" != "1" ]; then
-            echo "No se pudo decidir de qué carpeta salen las pruebas: no se publica."
-            exit 1
           fi
 
       - uses: actions/checkout@v4
@@ -176,7 +160,19 @@ jobs:
       # que las tres comprobaciones no puedan discrepar entre sí.
       BASE_URL: ${{ needs.build.outputs.hay_vista == 'si' && 'https://vilacos-source.github.io/FitClub/preview/' || 'https://vilacos-source.github.io/FitClub/' }}
     steps:
+      # OJO: este checkout NO lleva `path`, a propósito. El `if` y el `path: _vista`
+      # que sí tiene el checkout de la vista previa en el trabajo de compilación NO
+      # llegan aquí: son trabajos distintos y cada uno se descarga el repositorio
+      # otra vez, sin `_vista`. Poner ahí `working-directory: _vista` hace que el
+      # paso ni siquiera arranque («No such file or directory»), y eso tumba una
+      # publicación normal. Para probar la vista previa se trae su rama a la raíz.
       - uses: actions/checkout@v4
+        with:
+          # La app real se prueba contra `main` (que es lo que se publica). La vista
+          # previa, contra la rama que se acaba de publicar: si no, las pruebas
+          # saldrían de una copia distinta y podrían dar verde probando algo que no
+          # es lo que está en pie.
+          ref: ${{ needs.build.outputs.hay_vista == 'si' && needs.build.outputs.rama || 'main' }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -213,7 +209,6 @@ jobs:
         # de vista previa NO se ejecutaba hasta publicarlo (se descubrió con los de
         # la app instalable, que hubo que pasar a mano). Para la app real sigue
         # siendo `main`, que es exactamente lo que se publica.
-        working-directory: ${{ needs.build.outputs.carpeta }}
         run: npx playwright test --reporter=list
       - name: Vigilante de la web publicada (sitio y reglas)
         # Comprueba que la web está en pie, que los ficheros publicados son del
