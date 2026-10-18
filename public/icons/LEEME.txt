@@ -1,0 +1,3 @@
+Iconos generados con: node scripts/generar-iconos.mjs
+No editar a mano: cambia el script y vuelve a lanzarlo.
+Marca: degradado #4f46e5 → #7c3aed con una F blanca.

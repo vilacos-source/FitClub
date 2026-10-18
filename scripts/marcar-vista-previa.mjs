@@ -20,7 +20,7 @@
  * Uso:  node scripts/marcar-vista-previa.mjs <carpeta-del-build>
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,6 +29,9 @@ const SENAL = 'id="aviso-vista-previa"';
 
 /** Alto del aviso, en píxeles. Tiene que coincidir con el `padding-top`. */
 const ALTO = 30;
+
+/** Nombre con el que se guarda la app instalada desde la vista previa. */
+export const NOMBRE_VISTA = 'FitClub (prueba)';
 
 const AVISO = `
     <!-- Aviso de vista previa: añadido por scripts/marcar-vista-previa.mjs -->
@@ -77,12 +80,42 @@ export function marcar(html) {
   return salida;
 }
 
+/**
+ * Marca el manifiesto de la vista previa.
+ *
+ * Android e iOS guardan el nombre y los iconos **al instalar**, y no los
+ * actualizan solos. Si las dos versiones se llamaran igual, en el móvil quedarían
+ * dos iconos idénticos y no habría forma de saber cuál es el de pruebas — que es
+ * exactamente el error que este mecanismo existe para evitar.
+ *
+ * El resto del manifiesto NO se toca: usa rutas relativas, así que el mismo
+ * fichero vale igual un piso más abajo.
+ */
+export function marcarManifiesto(texto, nombre = NOMBRE_VISTA) {
+  const datos = JSON.parse(texto);
+  datos.name = nombre;
+  datos.short_name = nombre;
+  return JSON.stringify(datos, null, 2) + '\n';
+}
+
 /** Marca el `index.html` de la carpeta indicada. */
 export function marcarCarpeta(carpeta) {
   const fichero = path.join(carpeta, 'index.html');
   const antes = readFileSync(fichero, 'utf8');
   const despues = marcar(antes);
   writeFileSync(fichero, despues);
+
+  // El manifiesto tiene que estar: es lo que hace que la app se pueda instalar
+  // con su icono. Si falta, la vista previa no se parecería a lo que se publica
+  // justo en la parte que estamos probando, así que aquí se para.
+  const ficheroManifiesto = path.join(carpeta, 'manifest.json');
+  if (!existsSync(ficheroManifiesto)) {
+    throw new Error(
+      `No hay manifest.json en ${carpeta}: la vista previa no se podría instalar con su icono.`,
+    );
+  }
+  writeFileSync(ficheroManifiesto, marcarManifiesto(readFileSync(ficheroManifiesto, 'utf8')));
+
   return { fichero, cambiado: antes !== despues };
 }
 

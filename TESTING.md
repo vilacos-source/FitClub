@@ -426,6 +426,60 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+<<<<<<< Updated upstream
+=======
+### El texto de la invitación por WhatsApp ✅ aplicado
+- **Antes** el mensaje se montaba solo con las fechas, el premio y «El reto acaba
+  el…». Elena lo quiso más directo, y ahora es un texto fijo de dos líneas.
+- **El enlace se mantiene al final**, y no es un detalle: es por donde se registran
+  y es lo que copia el botón *Copiar*. Una invitación sin enlace no sirve.
+- `tests/e2e/invitacion.spec.ts`: **W1 ancla el texto exacto aprobado** y **W2
+  comprueba que el enlace de WhatsApp y el de la app siguen ahí**. Si algún día
+  cambia la redacción, W1 falla y hay que actualizarlo a propósito — **que falle es
+  el objetivo**: así cambiar el mensaje es una decisión, no un descuido.
+- Los dos descargan el fichero publicado y **exigen que no venga vacío**: si
+  viniera vacío, las comprobaciones de dentro darían un verde que no significa nada.
+- Comprobado **por A/B antes de publicar**: contra la web que aún tenía el texto
+  viejo, W1 se puso en rojo diciendo exactamente qué línea faltaba.
+
+---
+
+### La app instalable: icono en el móvil y sin barra del navegador ✅ aplicado
+- **Lo que se quería:** poder poner el icono en la pantalla de inicio y que al
+  abrirlo **no salga la barra del navegador**. Sin tiendas, sin cuotas y sin pasar
+  revisiones.
+- **Cada sistema pide cosas distintas**, y esto es lo que se descubrió:
+  - **Android** NO deja instalar la app con su icono propio si no encuentra un
+    fichero `sw.js`. Sin él crea un simple marcador: icono genérico **y además con
+    la barra del navegador**. Es lo que nadie documenta y lo más fácil de olvidar.
+  - **iPhone** lo consigue con tres etiquetas en el HTML
+    (`apple-mobile-web-app-capable` y compañía) más su propio icono, y no necesita
+    el `sw.js`.
+- **El `sw.js` NO guarda nada en caché, a propósito.** Existe solo porque Android lo
+  exige. Guardar copias traería de vuelta el **INC-012** (la app en blanco por servir
+  ficheros de un despliegue anterior) y rompería la recarga automática. Si algún día
+  se quiere «modo sin conexión», hay que leer esto antes de tocarlo.
+- **Los iconos se generan con un script** (`scripts/generar-iconos.mjs`), no a mano:
+  si cambia la marca, se vuelve a lanzar. La F se dibuja **con trazos, no con
+  texto**, para no depender de las tipografías de cada máquina. Se revisaron
+  mirando las imágenes: la F estaba 14 px descentrada y la versión recortable salía
+  diminuta — las dos cosas se corrigieron.
+- **El manifiesto usa rutas relativas** (`start_url: "./"`), así que el MISMO
+  fichero vale para la web real y para la vista previa, un piso más abajo. Si se
+  cambiara a `"/"`, la app instalada abriría en la raíz del dominio.
+- **La app instalada desde la vista previa se llama «FitClub (prueba)»**, y no es un
+  capricho: el móvil guarda el nombre y el icono **al instalar** y no los actualiza,
+  así que con dos nombres iguales quedarían dos iconos idénticos sin saber cuál es
+  cuál.
+- **Cubierto por X1–X4.** Son fallos **silenciosos** (un icono mal escrito no da
+  ningún error: simplemente no aparece), así que los tests descargan el manifiesto,
+  **cada icono** y el `sw.js`, y exigen que respondan. Comprobado por A/B antes de
+  publicar (contra la web sin esto: 3 en rojo con el motivo escrito) y con el build
+  servido en local, incluido que el navegador **registra** el `sw.js`.
+
+---
+
+>>>>>>> Stashed changes
 ### Probar los cambios antes de publicarlos: la vista previa ✅ aplicado
 - **El problema:** cada push a `main` salía directo a la URL que usa el grupo, así
   que un cambio roto lo veían ellos antes que Elena.
@@ -536,6 +590,15 @@ investigar**, y solo si falla otra vez mira el código.
 | V4 | Sin `<body>` falla en vez de servir una vista previa sin marcar | ✅ |
 | V5 | En el navegador el aviso se ve de verdad, arriba y a lo ancho | ✅ |
 | V6 | La versión real NO lleva la marca | ✅ |
+<<<<<<< Updated upstream
+=======
+| W1 | El texto de la invitación publicado es exactamente el aprobado | ✅ |
+| W2 | La invitación sigue llevando el enlace al final | ✅ |
+| X1 | El manifiesto publicado es válido y sus iconos descargan | ✅ |
+| X2 | El HTML trae lo que evita la barra del navegador (iPhone) | ✅ |
+| X3 | Está el fichero que Android exige para instalar con su icono | ✅ |
+| X4 | La app de la vista previa se llama distinto (dos iconos, dos nombres) | ✅ |
+>>>>>>> Stashed changes
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada
