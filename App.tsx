@@ -22,7 +22,9 @@ import {
   getDocFromServer,
   getDocs,
   query,
-  orderBy 
+  orderBy,
+  writeBatch,
+  type UpdateData
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { Home, Trophy, BookOpen, Settings } from 'lucide-react';
@@ -35,6 +37,7 @@ import {
   type DocumentoCopiado,
   type ResumenCopia,
 } from './services/backup';
+import { planDeReinicio } from './services/resetMember';
 
 /**
  * Emails con permisos de administrador.
@@ -445,6 +448,68 @@ const App: React.FC = () => {
     };
   };
 
+  /**
+   * Lee el último pesaje de alguien. Solo para administradores.
+   *
+   * Sirve para proponer el peso de partida del periodo nuevo: lo razonable es
+   * empezar por lo que pesa ahora, y eso es su último pesaje. Se lee AQUÍ y no en
+   * la pantalla, para que la pantalla no tenga que saber de Firestore (y para
+   * poder probar la parte que decide sin tocar la red).
+   */
+  const leerUltimoPesaje = async (userId: string): Promise<{ peso: number; fecha: string } | null> => {
+    try {
+      const snap = await getDoc(privateDataRef(userId));
+      if (!snap.exists()) return null;
+      const historial = (snap.data() as PrivateData).history;
+      if (!Array.isArray(historial) || historial.length === 0) return null;
+      const ultimo = historial[historial.length - 1];
+      return { peso: Number(ultimo.weight), fecha: String(ultimo.date) };
+    } catch {
+      // Sin permiso o sin documento no es un fallo: simplemente no hay nada que
+      // proponer, y la pantalla deja escribir el peso a mano.
+      return null;
+    }
+  };
+
+  /**
+   * Empezar de cero con un participante: borra sus pesajes, pone sus totales a
+   * cero y le fija un peso de partida nuevo para el periodo que empieza.
+   *
+   * No es dar de baja: la persona sigue en el reto, con su pseudónimo y su
+   * avatar.
+   *
+   * Los dos documentos se escriben en UN SOLO LOTE (`writeBatch`), que se aplica
+   * entero o no se aplica. Si fueran dos escrituras sueltas y fallara la segunda,
+   * la persona quedaría con cero pesajes y los puntos viejos: un estado que no se
+   * ve a simple vista y que falsea el ranking.
+   */
+  const reiniciarParticipante = async (userId: string, pesoInicial: number) => {
+    const plan = planDeReinicio(pesoInicial);
+    try {
+      const lote = writeBatch(db);
+      // El `as UpdateData<...>` está por un choque de tipos, no por inseguridad:
+      // Firestore pide que lo que se escribe sea parte del documento, y estas dos
+      // piezas son objetos planos definidos aparte (para poder probarlos sin
+      // tocar la red). Los campos que llevan los fija un test, uno por uno.
+      lote.update(privateDataRef(userId), plan.privado as UpdateData<PrivateData>);
+      lote.update(publicProfileRef(userId), plan.publico as UpdateData<Omit<PublicProfile, 'id'>>);
+      await lote.commit();
+
+      // Si quien reinicia es la propia administradora, su historial en memoria se
+      // queda viejo: se leyó al entrar y no está suscrito a cambios. Se refresca a
+      // mano, para que su pantalla no siga enseñando pesajes que ya no existen.
+      if (currentUser?.id === userId) {
+        setCurrentUser((prev: User | null) =>
+          prev ? { ...prev, ...plan.privado, ...plan.publico } : prev,
+        );
+      }
+    } catch (e) {
+      // Se deja subir a propósito: la pantalla traduce «permisos» y lo enseña. Un
+      // borrado que no se hizo no puede parecer que se hizo.
+      handleFirestoreError(e, OperationType.UPDATE, `users/${userId}`);
+    }
+  };
+
   const handleUpdateConfig = async (newConfig: CompetitionConfig) => {
     try {
       await setDoc(doc(db, "settings", "competition"), newConfig);
@@ -511,6 +576,8 @@ const App: React.FC = () => {
             config={competitionConfig} onUpdateConfig={handleUpdateConfig} 
             users={rankedUsers} 
             onExportar={exportarDatos}
+            onResetUser={reiniciarParticipante}
+            onLeerUltimoPesaje={leerUltimoPesaje}
             onRemoveUser={async (id) => {
               if (confirm("¿Estás seguro de que quieres eliminar a este usuario?")) {
                 try {

@@ -1,23 +1,32 @@
 
 import React, { useState } from 'react';
-import { Trash2, ShieldCheck, ShieldAlert, Plus, Share2, Copy, Check, AlertTriangle, Download, Database } from 'lucide-react';
+import { Trash2, ShieldCheck, ShieldAlert, Plus, Share2, Copy, Check, AlertTriangle, Download, Database, RotateCcw } from 'lucide-react';
 import { CompetitionConfig, RankedUser } from '../types';
 import type { ResumenCopia } from '../services/backup';
+import { aNumero, problemaConElPeso } from '../services/resetMember';
 
 interface AdminSettingsProps {
   config: CompetitionConfig;
   onUpdateConfig: (newConfig: CompetitionConfig) => void;
   users: RankedUser[];
   onRemoveUser: (userId: string) => void;
+  /** Borra el historial y los totales de alguien y le fija un peso de partida nuevo. */
+  onResetUser: (userId: string, pesoInicial: number) => Promise<void>;
+  /** Último pesaje de alguien, para proponerlo como peso de partida. `null` si no hay. */
+  onLeerUltimoPesaje: (userId: string) => Promise<{ peso: number; fecha: string } | null>;
   onAddUser: (userData: { realName: string, email: string, pseudonym: string, initialWeight: number }) => void;
   onToggleAdmin: (userId: string) => void;
   /** Junta todos los datos y los descarga como fichero. Devuelve el resumen. */
   onExportar: () => Promise<ResumenCopia>;
 }
 
-const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, users, onRemoveUser, onAddUser, onToggleAdmin, onExportar }) => {
+const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, users, onRemoveUser, onAddUser, onToggleAdmin, onExportar, onResetUser, onLeerUltimoPesaje }) => {
   const [formData, setFormData] = useState<CompetitionConfig>(config);
   const [userToDelete, setUserToDelete] = useState<RankedUser | null>(null);
+  const [userToReset, setUserToReset] = useState<RankedUser | null>(null);
+  const [pesoNuevo, setPesoNuevo] = useState('');
+  const [ultimoPesaje, setUltimoPesaje] = useState<{ peso: number; fecha: string } | null>(null);
+  const [reinicio, setReinicio] = useState<{ estado: 'quieto' | 'haciendo' | 'error'; mensaje?: string }>({ estado: 'quieto' });
   const [showAddForm, setShowAddForm] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [copia, setCopia] = useState<{
@@ -105,6 +114,56 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
       setNewUser({ realName: '', email: '', pseudonym: '', initialWeight: '' });
       setShowAddForm(false);
       alert('Participante apuntado. Mándale el enlace para que se registre con ese mismo email.');
+    }
+  };
+
+  /**
+   * Abre el reinicio de una persona.
+   *
+   * Antes de enseñar el formulario se lee su ÚLTIMO pesaje para proponerlo como
+   * peso de partida: lo razonable es empezar el periodo nuevo por lo que pesa
+   * ahora, no por el peso de hace un periodo (que es justo el error que se está
+   * arreglando). Si no se puede leer, se deja el peso con el que entró; y si
+   * tampoco, el campo vacío y se escribe a mano.
+   */
+  const abrirReinicio = async (user: RankedUser) => {
+    setUserToReset(user);
+    setUltimoPesaje(null);
+    setReinicio({ estado: 'quieto' });
+    setPesoNuevo(user.initialWeight ? String(user.initialWeight).replace('.', ',') : '');
+    const ultimo = await onLeerUltimoPesaje(user.id);
+    if (ultimo) {
+      setUltimoPesaje(ultimo);
+      setPesoNuevo(String(ultimo.peso).replace('.', ','));
+    }
+  };
+
+  const confirmarReinicio = async () => {
+    if (!userToReset) return;
+    const peso = aNumero(pesoNuevo);
+    const problema = problemaConElPeso(peso);
+    if (problema) {
+      setReinicio({ estado: 'error', mensaje: problema });
+      return;
+    }
+    setReinicio({ estado: 'haciendo' });
+    try {
+      await onResetUser(userToReset.id, peso);
+      setUserToReset(null);
+    } catch (e) {
+      // Un borrado que NO se hizo no puede parecer que se hizo: se traduce el
+      // fallo y se enseña, en vez de cerrar la ventana como si hubiera ido bien.
+      // El texto de Firestore puede llegar como código (`permission-denied`) o
+      // como su descripción (`Missing or insufficient permissions`), así que se
+      // miran las dos formas.
+      const texto = String((e as Error)?.message ?? e);
+      const sinPermisos = /permission-denied|insufficient permissions/i.test(texto);
+      setReinicio({
+        estado: 'error',
+        mensaje: sinPermisos
+          ? 'No se ha borrado nada: tu cuenta no tiene permisos de administradora en la base de datos. Entra con la cuenta de administradora del reto.'
+          : 'No se ha borrado nada. Vuelve a intentarlo; si sigue igual, avísame.',
+      });
     }
   };
 
@@ -284,6 +343,13 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
                   {user.isAdmin ? <ShieldAlert className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                 </button>
                 <button 
+                  onClick={() => abrirReinicio(user)}
+                  title="Empezar de cero: borra su historial para el periodo nuevo"
+                  className="p-2 text-amber-500 hover:bg-amber-50 rounded-xl transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+                <button 
                   onClick={() => setUserToDelete(user)} 
                   className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
                 >
@@ -339,6 +405,69 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
           </div>
         )}
       </div>
+
+      {/* Ventana de "Empezar de cero" (cambio de periodo) */}
+      {userToReset && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="card-modal w-full max-w-xs rounded-[2rem] p-6 scale-in-center">
+            <h3 className="text-center text-lg font-bold text-slate-800 mb-2">¿Empezar de cero?</h3>
+            <p className="text-center text-xs text-slate-500 mb-4">
+              Vas a borrar el historial de{' '}
+              <span className="font-bold text-slate-700">{userToReset.pseudonym}</span>
+              {userToReset.realName ? ` (${userToReset.realName})` : ''}: sus pesajes, sus
+              puntos y sus kilos perdidos.
+            </p>
+
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-[11px] text-emerald-800 mb-4">
+              <p className="font-bold mb-0.5">Lo que NO se borra</p>
+              <p>Sigue en el reto, con su nombre, su foto y su alta en la lista.</p>
+            </div>
+
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Peso de partida del periodo nuevo
+            </label>
+            <div className="relative mb-1">
+              <input
+                type="number"
+                step="0.1"
+                inputMode="decimal"
+                value={pesoNuevo}
+                onChange={(e) => setPesoNuevo(e.target.value)}
+                placeholder="Ej: 82,4"
+                className="w-full bg-slate-50 border-none rounded-xl py-2 px-3 text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+              <span className="absolute right-3 top-2 text-slate-400 text-xs font-bold">kg</span>
+            </div>
+            <p className="text-[10px] text-slate-400 mb-4">
+              {ultimoPesaje
+                ? `Su último pesaje fue ${String(ultimoPesaje.peso).replace('.', ',')} kg el ${new Date(ultimoPesaje.fecha + 'T00:00:00').toLocaleDateString('es-ES')}. Se empieza desde ahí.`
+                : 'Es el peso desde el que contarán sus kilos del periodo nuevo.'}
+            </p>
+
+            {reinicio.estado === 'error' && reinicio.mensaje && (
+              <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 text-[11px] text-rose-700 mb-3">
+                <p className="break-words">{reinicio.mensaje}</p>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={confirmarReinicio}
+                disabled={reinicio.estado === 'haciendo'}
+                className="w-full bg-amber-500 text-white font-bold py-2.5 rounded-xl active:scale-95 transition-all disabled:opacity-60"
+              >
+                {reinicio.estado === 'haciendo' ? 'Borrando…' : 'Empezar de cero'}
+              </button>
+              <button
+                onClick={() => setUserToReset(null)}
+                className="w-full bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Confirmación de Borrado */}
       {userToDelete && (

@@ -480,6 +480,47 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### Empezar de cero con un participante al cambiar de periodo 🟡 en la vista previa
+- **El problema que lo destapó:** al cambiar las fechas del reto para un periodo
+  nuevo, los pesajes del anterior **seguían ahí**. No es un dato a medias ni un
+  fallo de esa pantalla: los pesajes **no van etiquetados con el periodo** al que
+  pertenecen. Cada uno guarda su fecha, y la app decide si cuenta comparándola con
+  las fechas del reto **en el momento de mirarla**. Al mover las fechas, los viejos
+  dejan de contarse pero nadie los borra; y el primer pesaje del periodo nuevo
+  **arrastra el peso del último del anterior**, así que las cuentas salen mal desde
+  el primer día.
+- **Lo que se hizo:** un botón por participante, aparte del de dar de baja. Borra
+  sus pesajes y pone puntos y kilos a cero, **y le fija el peso de partida del
+  periodo nuevo**. **No es dar de baja**: la persona sigue en el reto, con su
+  nombre, su foto y su alta.
+- **Los dos borrados van en un solo lote** (`writeBatch`), que se aplica entero o
+  no se aplica. Si fueran dos escrituras sueltas y fallara la segunda, la persona
+  quedaría con cero pesajes y los puntos viejos: un estado que **no se ve a simple
+  vista** y que falsea el ranking. Mismo criterio que la copia de seguridad («una
+  copia a medias es peor que no tener copia»).
+- **El peso de partida se propone solo**: es su **último pesaje** (lo que pesa
+  ahora), no el peso con el que entró hace un periodo. Si no se puede leer, se deja
+  el de su alta; y si tampoco, se escribe a mano. Y se para **antes** de intentar
+  guardar si el peso es imposible: un cero no lo aceptarían las reglas, y el error
+  que devolvería Firestore («permisos insuficientes») no se parece a la causa.
+- **LAS REGLAS YA LO PERMITÍAN** — un administrador puede escribir los datos de
+  otro. Comprobado **haciendo la petición**, no leyéndolas, así que **no hizo falta
+  publicar reglas nuevas**.
+- **Cubierto por R1–R4.** R1 comprueba la **lista exacta** de campos que se tocan
+  (que no le cambie el nombre, ni la foto, ni el rol), R2 los pesos imposibles, R3
+  que las piezas están conectadas y que el lote lleva **dos** escrituras, y R4 es
+  una prueba **contra la base de datos de verdad**.
+- **R4 se salta sola** salvo que se pida (`PROBAR_REINICIO=si`): crea su propia
+  cuenta de administradora de prueba, apunta un participante de prueba, le hace el
+  reinicio **exactamente como lo hace la app** y **lo borra todo** al terminar. No
+  toca a nadie del grupo y no se ejecuta en cada publicación.
+- **Trampa que costó un falso culpable:** R4 comprobaba la limpieza **después** de
+  cerrar la sesión de prueba, y las lecturas sin sesión las deniegan las reglas →
+  salía un error de permisos que **parecía del reinicio** y no lo era. La limpieza
+  se comprueba con la sesión aún abierta; la cuenta se cierra al final.
+
+---
+
 ### Probar los cambios antes de publicarlos: la vista previa ✅ aplicado
 - **El problema:** cada push a `main` salía directo a la URL que usa el grupo, así
   que un cambio roto lo veían ellos antes que Elena.
@@ -619,6 +660,10 @@ batería salió verde contando «1 inestable» en lugar de un rojo.)
 | X2 | El HTML trae lo que evita la barra del navegador (iPhone) | ✅ |
 | X3 | Está el fichero que Android exige para instalar con su icono | ✅ |
 | X4 | La app de la vista previa se llama distinto (dos iconos, dos nombres) | ✅ |
+| R1 | Empezar de cero borra el historial y los totales, y NO toca nada más | ✅ |
+| R2 | Un peso de partida imposible se para antes de intentar guardarlo | ✅ |
+| R3 | El reinicio está conectado y escribe los dos documentos en un solo lote | ✅ |
+| R4 | Contra la base de datos: un admin puede de verdad poner a cero a alguien | ✅ comprobado · se salta salvo `PROBAR_REINICIO=si` |
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada
