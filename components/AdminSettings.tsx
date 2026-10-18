@@ -59,11 +59,9 @@ const AdminSettings: React.FC<AdminSettingsProps> = ({ config, onUpdateConfig, u
   // Enlace de la app. Se calcula en vivo para que funcione tanto en la web
   // publicada como en una prueba local, sin que haya que tocar nada.
   const enlaceApp = `${window.location.origin}${window.location.pathname}`;
-  // Texto de la invitación, tal cual lo aprobó Elena. Los datos del reto (fechas,
-  // premio) ya se ven dentro de la app, así que el mensaje va directo al grano.
-  // Se le añade el enlace al final, que es por donde se registran.
-  // Lo vigila el test W1 (tests/e2e/invitacion.spec.ts): si se cambia aquí, hay
-  // que actualizarlo allí a propósito — que falle es el objetivo.
+  // Texto de la invitación. Es fijo, tal cual lo pidió Elena: los datos del reto
+  // (fechas, premio) ya se ven dentro de la app, así que el mensaje va directo al
+  // grano. Se le añade el enlace al final, que es por donde se registran.
   const textoWhatsApp =
     `¡Te invito al Reto FitClub! 🏆\n\n` +
     `Regístrate y a por todas. Tu esfuerzo tiene premio.\n\n` +

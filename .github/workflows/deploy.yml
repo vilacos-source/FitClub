@@ -190,6 +190,13 @@ jobs:
         # Si lo que se acaba de publicar es la VISTA PREVIA, las pruebas van contra
         # ella: eso es lo que hay que comprobar antes de que lo vea nadie. Si no,
         # contra la web real.
+        #
+        # Y se sacan de la MISMA rama que se publica como vista previa. Antes salían
+        # siempre de `main`, y eso tenía un agujero: un test nuevo escrito en la rama
+        # de vista previa NO se ejecutaba hasta publicarlo (se descubrió con los de
+        # la app instalable, que hubo que pasar a mano). Para la app real sigue
+        # siendo `main`, que es exactamente lo que se publica.
+        working-directory: ${{ needs.build.outputs.hay_vista == 'si' && '_vista' || '.' }}
         run: npx playwright test --reporter=list
       - name: Vigilante de la web publicada (sitio y reglas)
         # Comprueba que la web está en pie, que los ficheros publicados son del

@@ -5,6 +5,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FitClub</title>
+
+    <!-- App instalable: icono en el móvil y sin barra del navegador.
+         Las rutas del manifiesto son RELATIVAS a propósito, así que el mismo
+         fichero vale para la web real y para la vista previa (que vive un piso
+         más abajo). Ojo: si se cambia `start_url` a "/", la app se abriría en la
+         raíz del dominio — y en GitHub Pages eso NO es FitClub. -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+
+    <!-- iPhone/iPad: estas tres líneas son las que consiguen que se abra SIN la
+         barra de Safari. Sin ellas, al abrir desde el icono sigue saliendo el
+         navegador y parece una página cualquiera. -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="FitClub">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+
     <link rel="stylesheet" href="/index.css">
 </head>
 <body>

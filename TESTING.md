@@ -442,6 +442,44 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### La app instalable: icono en el móvil y sin barra del navegador ✅ aplicado
+- **Lo que se quería:** poder poner el icono en la pantalla de inicio y que al
+  abrirlo **no salga la barra del navegador**. Sin tiendas, sin cuotas y sin pasar
+  revisiones.
+- **Cada sistema pide cosas distintas**, y esto es lo que se descubrió:
+  - **Android** NO deja instalar la app con su icono propio si no encuentra un
+    fichero `sw.js`. Sin él crea un simple marcador: icono genérico **y además con
+    la barra del navegador**. Es lo que nadie documenta y lo más fácil de olvidar.
+  - **iPhone** lo consigue con tres etiquetas en el HTML
+    (`apple-mobile-web-app-capable` y compañía) más su propio icono, y no necesita
+    el `sw.js`.
+- **El `sw.js` NO guarda nada en caché, a propósito.** Existe solo porque Android lo
+  exige. Guardar copias traería de vuelta el **INC-012** (la app en blanco por servir
+  ficheros de un despliegue anterior) y rompería la recarga automática. Si algún día
+  se quiere «modo sin conexión», hay que leer esto antes de tocarlo.
+- **Los iconos se generan con un script** (`scripts/generar-iconos.mjs`), no a mano:
+  si cambia la marca, se vuelve a lanzar. La F se dibuja **con trazos, no con
+  texto**, para no depender de las tipografías de cada máquina. Se revisaron
+  mirando las imágenes: la F estaba 14 px descentrada y la versión recortable salía
+  diminuta — las dos cosas se corrigieron.
+- **El manifiesto usa rutas relativas** (`start_url: "./"`), así que el MISMO
+  fichero vale para la web real y para la vista previa, un piso más abajo. Si se
+  cambiara a `"/"`, la app instalada abriría en la raíz del dominio.
+- **La app instalada desde la vista previa se llama «FitClub Test»** y la de verdad
+  «FitClub»: así las dos conviven en el móvil y se distinguen de un vistazo. Y no es
+  un capricho: el móvil guarda el nombre y el icono **al instalar** y no los
+  actualiza, así que sin nombres distintos quedarían **dos iconos idénticos** sin
+  saber cuál es cuál. Ojo al cambiar el nombre en el manifiesto de algo ya
+  instalado: el móvil **no lo renombra solo**; hay que quitar el icono viejo y
+  volver a añadirlo.
+- **Cubierto por X1–X4.** Son fallos **silenciosos** (un icono mal escrito no da
+  ningún error: simplemente no aparece), así que los tests descargan el manifiesto,
+  **cada icono** y el `sw.js`, y exigen que respondan. Comprobado por A/B antes de
+  publicar (contra la web sin esto: 3 en rojo con el motivo escrito) y con el build
+  servido en local, incluido que el navegador **registra** el `sw.js`.
+
+---
+
 ### Probar los cambios antes de publicarlos: la vista previa ✅ aplicado
 - **El problema:** cada push a `main` salía directo a la URL que usa el grupo, así
   que un cambio roto lo veían ellos antes que Elena.
@@ -565,6 +603,10 @@ batería salió verde contando «1 inestable» en lugar de un rojo.)
 | V6 | La versión real NO lleva la marca | ✅ |
 | W1 | El texto de la invitación publicado es exactamente el aprobado | ✅ |
 | W2 | La invitación sigue llevando el enlace al final | ✅ |
+| X1 | El manifiesto publicado es válido y sus iconos descargan | ✅ |
+| X2 | El HTML trae lo que evita la barra del navegador (iPhone) | ✅ |
+| X3 | Está el fichero que Android exige para instalar con su icono | ✅ |
+| X4 | La app de la vista previa se llama distinto (dos iconos, dos nombres) | ✅ |
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada
