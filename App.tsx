@@ -8,6 +8,7 @@ import Leaderboard from './components/Leaderboard';
 import Rules from './components/Rules';
 import AdminSettings from './components/AdminSettings';
 import LandingPage from './components/LandingPage';
+import AvisoInstalar from './components/AvisoInstalar';
 
 // Firebase imports
 import { db, auth, handleFirestoreError, OperationType, publicProfileRef, privateDataRef, PUBLIC_COLLECTION, PRIVATE_COLLECTION } from './services/firebase';
@@ -537,6 +538,10 @@ const App: React.FC = () => {
         <main className="flex-1 p-4 pb-24 overflow-y-auto">
           <LandingPage onRegister={handleRegister} />
         </main>
+        {/* Justo aquí: es la pantalla que ve quien llega desde el enlace de
+            WhatsApp para registrarse, o sea el momento exacto en que interesa
+            decirle que puede tenerla como app. */}
+        <AvisoInstalar />
       </div>
     );
   }

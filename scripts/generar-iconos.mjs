@@ -82,6 +82,59 @@ for (const pieza of PIEZAS) {
   console.log(`  ${destino}  (${pieza.tam}×${pieza.tam})`);
 }
 
+/**
+ * Captura de pantalla para el manifiesto.
+ *
+ * POR QUÉ HACE FALTA: en Android el navegador enseña una barrita pequeña de
+ * "añadir" si el manifiesto no trae capturas, y el diálogo grande con la app
+ * presentada (el que parece el de una tienda de apps) si las trae. Es la
+ * diferencia entre que la gente se dé cuenta o no de que puede instalarla.
+ *
+ * Se dibuja con código y no se hace una foto de la app real: así no depende de
+ * los datos de nadie (ni nombres ni pesos), y no se queda vieja.
+ */
+const ANCHO = 1080;
+const ALTO = 1920;
+const captura = await navegador.newPage({ viewport: { width: ANCHO, height: ALTO } });
+await captura.setContent(`<html><body style="margin:0;padding:0;height:${ALTO}px;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:linear-gradient(168deg,#e7ebff,#f2eaff,#e4f1ff);display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:28px">
+  <div style="width:200px;height:200px;border-radius:48px;background:linear-gradient(135deg,${AZUL},${VIOLETA});
+    display:flex;align-items:center;justify-content:center;box-shadow:0 24px 60px rgba(79,70,229,.35)">
+    <svg width="120" height="120" viewBox="0 0 512 512"><path
+      d="M 196 150 H 316 V 200 H 248 V 240 H 304 V 288 H 248 V 362 H 196 Z" fill="#ffffff"/></svg>
+  </div>
+  <div style="text-align:center">
+    <div style="font-size:64px;font-weight:900;color:#1e293b;letter-spacing:-2px">FitClub</div>
+    <div style="font-size:34px;color:#64748b;margin-top:10px">El reto del grupo</div>
+  </div>
+  <div style="display:flex;gap:16px;margin-top:20px">
+    <div style="background:#fff;border-radius:20px;padding:24px 30px;box-shadow:0 10px 30px rgba(30,41,59,.08)">
+      <!-- Dibujos hechos con trazos, no emoji: en la máquina que genera la imagen
+           puede no haber tipografía de emoji y salen cuadraditos vacíos. -->
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${AZUL}" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/>
+        <path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>
+      <div style="font-size:24px;color:#475569;margin-top:6px;text-align:center">Puntos</div>
+    </div>
+    <div style="background:#fff;border-radius:20px;padding:24px 30px;box-shadow:0 10px 30px rgba(30,41,59,.08)">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${AZUL}" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/>
+        <path d="M7 9a3 3 0 0 1 3 3 3 3 0 0 1-3 3M17 15a3 3 0 0 1-3-3 3 3 0 0 1 3-3"/></svg>
+      <div style="font-size:24px;color:#475569;margin-top:6px;text-align:center">Pesajes</div>
+    </div>
+    <div style="background:#fff;border-radius:20px;padding:24px 30px;box-shadow:0 10px 30px rgba(30,41,59,.08)">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${AZUL}" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="8" height="18" rx="2"/>
+        <path d="M5 8h3M5 12h3M5 16h3M16 8h3M16 12h3M16 16h3"/></svg>
+      <div style="font-size:24px;color:#475569;margin-top:6px;text-align:center">Ranking</div>
+    </div>
+  </div>
+</body></html>`);
+await captura.screenshot({ path: `${SALIDA}/captura-1080x1920.png` });
+console.log(`  ${SALIDA}/captura-1080x1920.png  (${ANCHO}×${ALTO})`);
+
 await navegador.close();
 
 // Un fichero de texto para que el script sea re-ejecutable sin reescribirlo a mano.

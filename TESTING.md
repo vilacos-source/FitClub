@@ -542,6 +542,49 @@ perfectamente**, y estuve a punto de “arreglar” código que no estaba roto.
 
 ---
 
+### Aviso de "instala la app" al llegar desde el enlace 🟡 en la vista previa
+- **El problema:** al mandar el enlace de descarga a alguien nuevo, abría la app
+  **dentro del navegador, con su barra**, y no le aparecía nada que le ofreciera
+  instalarla. Se quedaba con la versión "de navegador" sin saber que existe la otra.
+- **Comprobado antes de tocar nada:** la app **ya cumplía** todo lo que Chrome exige
+  para considerarla instalable, y **el navegador sí ofrecía instalarla** (el aviso
+  interno se disparaba). Lo que faltaba era que **la propia app lo dijera**: sin
+  botón, dependía de encontrar la opción escondida en el menú del navegador.
+- **Ahora como se comporta, y NO es igual en los dos móviles** (esto es del
+  navegador, no de la app):
+  - **Android:** un aviso abajo con el botón **«Instalar la app»**, que abre la
+    instalación de verdad. El aviso espera a que el navegador diga que se puede
+    instalar (no se enseña un botón que no funcione). Si el botón no abriera nada,
+    el propio aviso dice dónde más está.
+  - **iPhone:** **no se puede lanzar la instalación desde la web** — está confirmado
+    por Apple (el evento que lo permite no está implementado en Safari y no tienen
+    previsto hacerlo). Lo único que funciona son dos toques, así que el aviso los
+    explica: **Compartir → Añadir a pantalla de inicio**. Y si se abre en **Chrome
+    de iPhone**, avisa de que ahí no se puede y que hay que hacerlo en Safari.
+- **No sale** si la app ya está instalada (se abrió desde el icono), si la persona
+  lo cerró antes (se guarda la decisión y no se insiste) ni en un ordenador.
+- **El aviso se enseña en la pantalla de registro**, que es justo la que ve quien
+  llega desde el enlace.
+- **Captura de pantalla en el manifiesto:** sin capturas, Android enseña la barrita
+  pequeña de "añadir"; con ellas, el diálogo grande con la app presentada (el que
+  parece de una tienda de apps). Se genera con código (`generar-iconos.mjs`) y **no
+  con una foto de la app real**: así no lleva los nombres ni los pesos de nadie.
+- **Trampa de la generación:** los iconos de la captura iban a ser emoji y salieron
+  como **cuadraditos vacíos** (esa máquina no tiene tipografía de emoji). Se
+  cambiaron por dibujos de trazos. Vale como regla: **nunca confiar en emoji dentro
+  de una imagen generada**.
+- **Cubierto por Y1–Y3.** Y1 que cada móvil recibe el aviso que le sirve (y que el
+  iPad se detecta, porque se anuncia como Mac), Y2 que está montado donde se ve y no
+  insiste si se cierra, y Y3 que la captura existe de verdad y que el manifiesto
+  sigue trayendo lo que Chrome exige.
+- **Comprobado en el navegador con los dos agentes cambiados de verdad** (Android e
+  iPhone): en Android sale el botón, en iPhone salen los dos toques y **no** el
+  botón. Ojo con la trampa de probarlo: al simular un móvil hay que cambiar el
+  **agente del navegador**; redimensionar la ventana no basta y el aviso (muy
+  correctamente) no aparece porque se cree un ordenador.
+
+---
+
 ### Probar los cambios antes de publicarlos: la vista previa ✅ aplicado
 - **El problema:** cada push a `main` salía directo a la URL que usa el grupo, así
   que un cambio roto lo veían ellos antes que Elena.
@@ -686,6 +729,9 @@ batería salió verde contando «1 inestable» en lugar de un rojo.)
 | R3 | Sin peso de partida, el ranking no se rompe: nada de NaN | ✅ |
 | R4 | Contra la base de datos: un admin puede de verdad poner a cero a alguien | ✅ comprobado · se salta salvo `PROBAR_REINICIO=si` |
 | R5 | Contra la base de datos: el primer pesaje fija el peso de partida y NO se puede cambiar después | ✅ comprobado · se salta salvo `PROBAR_REINICIO=si` |
+| Y1 | Cada móvil recibe el aviso que le sirve (Android botón, iPhone dos toques) | ✅ |
+| Y2 | El aviso está donde se ve, y no insiste si se cierra | ✅ |
+| Y3 | El manifiesto trae la captura de pantalla y los iconos que Chrome exige | ✅ |
 
 Los tests **se limpian solos**: borran la cuenta y los datos que crean (ver
 `tests/e2e/helpers/cleanup.ts`), así que el proyecto no acumula basura en cada
